@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
-from ops import binary_indicator, stochastic_binary_indicator, depth_min, depth_inc
+from .ops import binary_indicator, stochastic_binary_indicator, depth_min, depth_inc
 
 
 
@@ -40,7 +40,7 @@ class ANT:
         self.stochastic = stochastic
 
         self.training = False
-        self.root = SolverNode(self, in_shape)
+        self.root = SolverNode(self, self.new_solver(self.in_shape, self.num_classes))
 
     def fit(self, X, y):
         pass  # TODO
@@ -176,3 +176,6 @@ class SolverNode(TreeNode):
         self.unexpanded_depth = None
         return self
 
+    def set_frozen(self, frozen, recursive=False):
+        for param in self.solver.parameters():
+            param.requires_grad = not frozen
