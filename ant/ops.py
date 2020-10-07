@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
@@ -29,6 +30,18 @@ class StochasticBinaryIndicator(torch.autograd.Function):
     def backward(self, g):
         return g
 stochastic_binary_indicator = StochasticBinaryIndicator.apply
+
+
+class Stack(nn.Module):
+    """ Stacks torch modules in the given axis. """
+    def __init__(self, *modules, dim=0):
+        super().__init__()
+        self.inner = nn.ModuleList(modules)
+        self.dim = dim
+
+    def forward(self, x):
+        ys = [f(x) for f in self.inner]
+        return torch.stack(ys, dim=self.dim)
 
 
 def depth_min(a, b):

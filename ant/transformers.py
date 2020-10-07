@@ -14,7 +14,13 @@ class FullyConnected1DTransformer(Transformer):
         super().__init__(in_shape, in_shape)
         assert len(in_shape) == 1
 
-        self.fc = nn.Linear(in_shape[0], in_shape[0])
+        # TODO make this parametrizable
+        self.model = nn.Sequential(
+            nn.Linear(in_shape[0], 50),
+            nn.ReLU(),
+            nn.Linear(50, in_shape[0]),
+            nn.ReLU(),
+        )
 
     def forward(self, x):
-        return self.fc(x)
+        return self.model(x)
