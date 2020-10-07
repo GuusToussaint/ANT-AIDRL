@@ -2,7 +2,7 @@ import torch.nn as nn
 
 class Solver(nn.Module):
     """ Given its input outputs its prediction for each class. When num_classes = 1,
-        assume regression, otherwise output log probabilities for each class. """
+        assume regression, otherwise output probabilities for each class. """
 
     def __init__(self, in_shape, num_classes):
         super().__init__()
@@ -20,7 +20,7 @@ class Linear1DSolver(Solver):
         if num_classes == 1:
             self.model = nn.Linear(in_shape[0], num_classes)
         else:
-            self.model = nn.Sequential(nn.Linear(in_shape[0], num_classes), nn.LogSoftmax())
+            self.model = nn.Sequential(nn.Linear(in_shape[0], num_classes), nn.Softmax())
 
     def forward(self, x):
         return self.model(x)
