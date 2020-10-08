@@ -37,7 +37,7 @@ if __name__ == "__main__":
             new_optimizer = torch.optim.Adam)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    t.do_train(trainloader, testloader, expand_epochs=3, final_epochs=5, device=device)
+    t.do_train(trainloader, testloader, max_expand_epochs=3, max_final_epochs=5, device=device)
 
 
     total = 0
