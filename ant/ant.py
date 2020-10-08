@@ -53,7 +53,7 @@ class ANT:
             nll_loss = nn.NLLLoss()
             self.loss_function = lambda pred, target: nll_loss(torch.log(pred), target)
 
-    def do_train(self, train_loader, val_loader, expand_epochs, final_epochs, *, device="cpu", verbose=True):
+    def do_train(self, train_loader, val_loader, max_expand_epochs, max_final_epochs, *, device="cpu", verbose=True):
         self.training = True
 
         try:
@@ -62,22 +62,24 @@ class ANT:
 
             # Create initial leaf and train it.
             self.root = SolverNode(self, self.new_solver(self.in_shape, self.num_classes))
-            self.root.do_train(train_loader, expand_epochs, device=device, verbose=verbose)
+            self.root.do_train(train_loader, max_expand_epochs, device=device, verbose=verbose)
 
             # Expand while possible.
             while not self.root.fully_expanded():
-                self.root = self.root.expand(train_loader, val_loader, expand_epochs, device=device, verbose=verbose)
+                self.root = self.root.expand(train_loader, val_loader, max_expand_epochs, device=device, verbose=verbose)
             
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
             self.root.set_frozen(False, recursive=True)
-            self.root.do_train(train_loader, final_epochs, device=device, verbose=verbose)
+            self.root.do_train(train_loader, max_final_epochs, device=device, verbose=verbose)
 
         finally:
             self.training = False
         
-
+    def get_tree_composition(self):
+        """ Returns (num_router, num_transformer, num_solver). """
+        return self.root.get_tree_composition()
 
     def fit(self, X, y):
         raise NotImplementedError   # TODO, sklearn interface
@@ -97,6 +99,9 @@ class TreeNode(nn.Module):
 
     def fully_expanded(self):
         return self.unexpanded_depth is None
+    
+    def get_tree_composition(self):
+        raise NotImplementedError
 
     def expand(self):
         raise NotImplementedError
@@ -104,12 +109,18 @@ class TreeNode(nn.Module):
     def set_frozen(self, frozen, recursive=False):
         raise NotImplementedError
 
-    def do_train(self, train_loader, epochs, *, device, verbose, multi_head=False):
+    def do_train(self, train_loader, max_epochs, *, device, verbose, multi_head=False, patience=float('inf')):
         self.to(device)
         self.train()
         optimizer = self.ant.new_optimizer(self.parameters())
         running_loss = 0.0
-        for epoch in range(epochs):
+
+        last_epoch_loss = float('inf')
+        no_improvement_epochs = 0
+
+        for epoch in range(max_epochs):
+            epoch_loss = 0.0
+
             for i, data in enumerate(train_loader):
                 inputs, labels = data[0].to(device), data[1].to(device)
 
@@ -123,7 +134,16 @@ class TreeNode(nn.Module):
                 loss.backward()
                 optimizer.step()
 
-                running_loss += loss.item()
+                batch_loss = loss.item()
+                running_loss += batch_loss
+                epoch_loss += batch_loss
+
+            if last_epoch_loss <= epoch_loss:
+                no_improvement_epochs += 1
+            if no_improvement_epochs > patience:
+                break
+
+            last_epoch_loss = epoch_loss
                 # if verbose:
                 #     # Print every 100 mini-batches.
                 #     if i % 100 == 99:
@@ -159,6 +179,9 @@ class RouterNode(TreeNode):
                                                     self.right_child.unexpanded_depth))
         self.router = router
 
+    def get_tree_composition(self):
+        num_router, num_transformer, num_solver = self.left_child.get_tree_composition()
+        return (num_router + r[0] + 1, num_transformer + r[1], num_solver + r[2])
 
     def expand(self, *args, **kwargs):
         ld = self.left_child.unexpanded_depth
@@ -216,6 +239,9 @@ class TransformerNode(TreeNode):
         self.unexpanded_depth = depth_inc(self.child.unexpanded_depth)
         self.transformer = transformer
 
+    def get_tree_composition(self):
+        num_router, num_transformer, num_solver = self.child.get_tree_composition()
+        return (num_router, num_transformer + 1, num_solver)
 
     def expand(self, *args, **kwargs):
         if self.child.unexpanded_depth is None:
@@ -244,11 +270,14 @@ class SolverNode(TreeNode):
         self.unexpanded_depth = 0
         self.solver = solver
 
-    def expand(self, train_loader, val_loader, expand_epochs, *, device, verbose):
+    def get_tree_composition(self):
+        return (0, 0, 1)
+
+    def expand(self, train_loader, val_loader, max_expand_epochs, *, device, verbose):
         if verbose:
             print("Attempting to expand leaf node.")
 
-        # Mark as expanded.
+        # Mark leaf as expanded.
         self.unexpanded_depth = None
 
         # Use pre-trained existing leaf.
@@ -270,7 +299,7 @@ class SolverNode(TreeNode):
         try:
             # Monkey-patch this nodes solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
-            self.ant.root.do_train(train_loader, expand_epochs, device=device, verbose=verbose, multi_head=True)
+            self.ant.root.do_train(train_loader, max_expand_epochs, device=device, verbose=verbose, multi_head=True)
             val_losses = self.ant.root.do_eval(val_loader, device=device, multi_head=True)
         finally:
             # Restore self.
