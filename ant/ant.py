@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
+from . import ops
 from .ops import binary_indicator, stochastic_binary_indicator, depth_min, depth_inc, Stack
 
 
@@ -71,7 +72,7 @@ class ANT:
 
             # Create initial leaf and train it.
             self.root = SolverNode(self, self.new_solver(self.in_shape, self.num_classes))
-            self.root.do_train(train_loader, max_expand_epochs, device=device, verbose=verbose)
+            ops.train(self.root, train_loader, self.loss_function, self.new_optimizer, max_expand_epochs, device=device, verbose=verbose)
 
             # Expand while possible.
             while not self.root.fully_expanded():
@@ -81,7 +82,7 @@ class ANT:
             if verbose:
                 print("Starting final refinement.")
             self.root.set_frozen(False, recursive=True)
-            self.root.do_train(train_loader, max_final_epochs, device=device, verbose=verbose)
+            ops.train(self.root, train_loader, self.loss_function, self.new_optimizer, max_expand_epochs, device=device, verbose=verbose)
 
         finally:
             self.training = False
@@ -117,64 +118,6 @@ class TreeNode(nn.Module):
 
     def set_frozen(self, frozen, recursive=False):
         raise NotImplementedError
-
-    def do_train(self, train_loader, max_epochs, *, device, verbose, multi_head=False, patience=float('inf')):
-        self.to(device)
-        self.train()
-        optimizer = self.ant.new_optimizer(self.parameters())
-        running_loss = 0.0
-
-        last_epoch_loss = float('inf')
-        no_improvement_epochs = 0
-
-        for epoch in range(max_epochs):
-            epoch_loss = 0.0
-
-            for i, data in enumerate(train_loader):
-                inputs, labels = data[0].to(device), data[1].to(device)
-
-                optimizer.zero_grad()
-                outputs = self(inputs)
-                if multi_head:
-                    loss = sum(self.ant.loss_function(output_head, labels)
-                               for output_head in outputs)
-                else:
-                    loss = self.ant.loss_function(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-                batch_loss = loss.item()
-                running_loss += batch_loss
-                epoch_loss += batch_loss
-
-            if last_epoch_loss <= epoch_loss:
-                no_improvement_epochs += 1
-            if no_improvement_epochs > patience:
-                break
-
-            last_epoch_loss = epoch_loss
-                # if verbose:
-                #     # Print every 100 mini-batches.
-                #     if i % 100 == 99:
-                #         print("[{}, {:5}] loss: {:.3}".format(epoch + 1, i + 1, running_loss / 100))
-                #         running_loss = 0.0
-
-    def do_eval(self, val_loader, *, device, multi_head=False):
-        self.to(device)
-        self.eval()
-        total_loss = 0.0
-        with torch.no_grad():
-            for data in val_loader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = self(inputs)
-                if multi_head:
-                    loss = torch.tensor([self.ant.loss_function(output_head, labels)
-                                         for output_head in outputs])
-                else:
-                    loss = self.ant.loss_function(outputs, labels)
-                total_loss += loss
-        return total_loss
-        
 
 
 
@@ -219,6 +162,7 @@ class RouterNode(TreeNode):
         
         raise NotImplementedError
 
+        # FIXME: implement single-path routing?
         # if self.ant.stochastic:
         #     ind = stochastic_binary_indicator(p)
         # else:
@@ -309,11 +253,16 @@ class SolverNode(TreeNode):
             s1.solver.load_state_dict(leaf_candidate.state_dict())
             s2.solver.load_state_dict(leaf_candidate.state_dict())
 
+        
+        multi_head_loss = lambda outputs, labels: sum(self.ant.loss_function(output_head, labels)
+                                                      for output_head in outputs)
+
         try:
             # Monkey-patch this nodes' solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
-            self.ant.root.do_train(train_loader, max_expand_epochs, device=device, verbose=verbose, multi_head=True)
-            val_losses = self.ant.root.do_eval(val_loader, device=device, multi_head=True)
+            ops.train(self.ant.root, train_loader, multi_head_loss, self.ant.new_optimizer, max_expand_epochs,
+                      val_loader=val_loader, device=device, verbose=verbose)
+            val_losses = ops.eval(self.ant.root, val_loader, multi_head_loss, device=device)
         finally:
             # Restore self.
             self.solver = leaf_candidate

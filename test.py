@@ -28,9 +28,8 @@ if __name__ == "__main__":
     # For quick debugging.
     trainset = torch.utils.data.Subset(trainset, range(256))
     testset = torch.utils.data.Subset(testset, range(32))
-
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=1)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False, num_workers=1)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, num_workers=1)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=8, shuffle=False, num_workers=1)
 
 
     classes = ('plane', 'car', 'bird', 'cat',

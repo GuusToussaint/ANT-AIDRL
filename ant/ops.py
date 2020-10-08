@@ -55,3 +55,74 @@ def depth_inc(x):
     """ Returns x + 1, respecting None as positive infinity. """
     return None if x is None else x + 1
 
+
+
+# Torch generic train/eval functions.
+def train(model, train_loader, loss_function, new_optimizer, max_epochs, *,
+          device=None, val_loader=None, patience=None, verbose=False):
+    if device:
+        model.to(device)
+
+    if patience is not None and val_loader is None:
+        raise ValueError("patience require a validation set")
+
+
+    last_val_loss = float('inf')
+    no_improvement_epochs = 0
+
+    optimizer = new_optimizer(model.parameters())
+    for epoch in range(max_epochs):
+        model.train()
+        epoch_loss = 0.0
+
+        for i, data in enumerate(train_loader):
+            inputs, labels = data
+            if device:
+                inputs, labels = inputs.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = loss_function(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        epoch_loss /= len(train_loader)
+        
+        if val_loader and (verbose or patience is not None):
+            val_loss = eval(model, val_loader, loss_function, device=device)
+            val_loss /= len(val_loader)
+        else:
+            val_loss = None
+        
+        if verbose:
+            out = "Epoch {}, train loss {:.5}".format(epoch + 1, epoch_loss)
+            if val_loss is not None:
+                out += ", val loss {:.5}".format(val_loss)
+            print(out)
+
+        if patience is not None:
+            if val_loss >= last_val_loss:
+                no_improvement_epochs += 1
+            if no_improvement_epochs > patience:
+                break
+
+        last_val_loss = val_loss
+        
+
+
+def eval(model, data_loader, loss_function, *, device=None):
+    if device:
+        model.to(device)
+
+    model.eval()
+    total = 0.0
+    for i, data in enumerate(data_loader):
+        inputs, labels = data
+        if device:
+            inputs, labels = inputs.to(device), labels.to(device)
+
+        outputs = model(inputs)
+        total += loss_function(outputs, labels)
+    
+    return total
