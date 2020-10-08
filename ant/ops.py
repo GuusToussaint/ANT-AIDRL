@@ -22,12 +22,12 @@ class StochasticBinaryIndicator(torch.autograd.Function):
         Gradient is passed straight through.
     """
     @staticmethod
-    def forward(self, x):
+    def forward(ctx, x):
         r = x.new_empty(x.size()).uniform_(0, 1)
         return torch.abs(torch.round(x - r + 0.5))
 
     @staticmethod
-    def backward(self, g):
+    def backward(ctx, g):
         return g
 stochastic_binary_indicator = StochasticBinaryIndicator.apply
 
