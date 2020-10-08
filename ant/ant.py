@@ -4,18 +4,30 @@ import torch.optim as optim
 import random
 
 from . import ops
-from .ops import binary_indicator, stochastic_binary_indicator, depth_min, depth_inc, Stack
-
-
+from .ops import (
+    binary_indicator,
+    stochastic_binary_indicator,
+    depth_min,
+    depth_inc,
+    Stack,
+)
 
 
 class ANT:
-    def __init__(self, in_shape, num_classes,
-                 new_router, new_transformer, new_solver,
-                 new_optimizer,
-                 soft_decision=True, stochastic=False,
-                 router_inherit=True, transformer_inherit=False):
-        """ Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
+    def __init__(
+        self,
+        in_shape,
+        num_classes,
+        new_router,
+        new_transformer,
+        new_solver,
+        new_optimizer,
+        soft_decision=True,
+        stochastic=False,
+        router_inherit=True,
+        transformer_inherit=False,
+    ):
+        """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
         in_shape gives the input shape (excluding first batch dimension).
 
@@ -53,9 +65,7 @@ class ANT:
         self.router_inherit = router_inherit
         self.transformer_inherit = transformer_inherit
 
-
         self.training = False
-
 
         if num_classes == 1:
             self.loss_function = nn.MSELoss()
@@ -63,7 +73,16 @@ class ANT:
             nll_loss = nn.NLLLoss()
             self.loss_function = lambda pred, target: nll_loss(torch.log(pred), target)
 
-    def do_train(self, train_loader, val_loader, max_expand_epochs, max_final_epochs, *, device="cpu", verbose=True):
+    def do_train(
+        self,
+        train_loader,
+        val_loader,
+        max_expand_epochs,
+        max_final_epochs,
+        *,
+        device="cpu",
+        verbose=True
+    ):
         self.training = True
 
         try:
@@ -71,32 +90,55 @@ class ANT:
                 print("Starting tree build process.")
 
             # Create initial leaf and train it.
-            self.root = SolverNode(self, self.new_solver(self.in_shape, self.num_classes))
-            ops.train(self.root, train_loader, self.loss_function, self.new_optimizer, max_expand_epochs, device=device, verbose=verbose)
+            self.root = SolverNode(
+                self, self.new_solver(self.in_shape, self.num_classes)
+            )
+            ops.train(
+                self.root,
+                train_loader,
+                self.loss_function,
+                self.new_optimizer,
+                max_expand_epochs,
+                device=device,
+                verbose=verbose,
+            )
 
             # Expand while possible.
             while not self.root.fully_expanded():
-                self.root = self.root.expand(train_loader, val_loader, max_expand_epochs, device=device, verbose=verbose)
-            
+                self.root = self.root.expand(
+                    train_loader,
+                    val_loader,
+                    max_expand_epochs,
+                    device=device,
+                    verbose=verbose,
+                )
+
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
             self.root.set_frozen(False, recursive=True)
-            ops.train(self.root, train_loader, self.loss_function, self.new_optimizer, max_expand_epochs, device=device, verbose=verbose)
+            ops.train(
+                self.root,
+                train_loader,
+                self.loss_function,
+                self.new_optimizer,
+                max_expand_epochs,
+                device=device,
+                verbose=verbose,
+            )
 
         finally:
             self.training = False
-        
+
     def get_tree_composition(self):
         """ Returns (num_router, num_transformer, num_solver). """
         return self.root.get_tree_composition()
 
     def fit(self, X, y):
-        raise NotImplementedError   # TODO, sklearn interface
+        raise NotImplementedError  # TODO, sklearn interface
 
     def predict(self, X, y):
-        raise NotImplementedError   # TODO, sklearn interface
-
+        raise NotImplementedError  # TODO, sklearn interface
 
 
 class TreeNode(nn.Module):
@@ -109,7 +151,7 @@ class TreeNode(nn.Module):
 
     def fully_expanded(self):
         return self.unexpanded_depth is None
-    
+
     def get_tree_composition(self):
         raise NotImplementedError
 
@@ -120,15 +162,16 @@ class TreeNode(nn.Module):
         raise NotImplementedError
 
 
-
-
 class RouterNode(TreeNode):
     def __init__(self, ant, router, left_child, right_child):
         super().__init__(ant, router.in_shape, router.in_shape)
         self.left_child = left_child
         self.right_child = right_child
-        self.unexpanded_depth = depth_inc(depth_min(self.left_child.unexpanded_depth,
-                                                    self.right_child.unexpanded_depth))
+        self.unexpanded_depth = depth_inc(
+            depth_min(
+                self.left_child.unexpanded_depth, self.right_child.unexpanded_depth
+            )
+        )
         self.router = router
 
     def get_tree_composition(self):
@@ -150,16 +193,18 @@ class RouterNode(TreeNode):
             self.left_child.set_frozen(True, recursive=True)
             self.right_child = self.right_child.expand(*args, **kwargs)
 
-        self.unexpanded_depth = depth_inc(depth_min(self.left_child.unexpanded_depth,
-                                                    self.right_child.unexpanded_depth))
+        self.unexpanded_depth = depth_inc(
+            depth_min(
+                self.left_child.unexpanded_depth, self.right_child.unexpanded_depth
+            )
+        )
         return self
-
 
     def forward(self, x):
         p = self.router(x)
         if self.ant.soft_decision or self.ant.training:
-            return p*self.left_child(x) + (1 - p)*self.right_child(x)
-        
+            return p * self.left_child(x) + (1 - p) * self.right_child(x)
+
         raise NotImplementedError
 
         # FIXME: implement single-path routing?
@@ -175,7 +220,6 @@ class RouterNode(TreeNode):
         # o[right_mask] = self.right_child(x[right_mask])
         # return o
 
-
     def set_frozen(self, frozen, recursive=False):
         for param in self.router.parameters():
             param.requires_grad = not frozen
@@ -183,7 +227,6 @@ class RouterNode(TreeNode):
         if recursive:
             self.left_child.set_frozen(frozen, True)
             self.right_child.set_frozen(frozen, True)
-
 
 
 class TransformerNode(TreeNode):
@@ -217,7 +260,6 @@ class TransformerNode(TreeNode):
             self.child.set_frozen(frozen, True)
 
 
-
 class SolverNode(TreeNode):
     def __init__(self, ant, solver):
         super().__init__(ant, solver.in_shape, (1,))
@@ -246,23 +288,37 @@ class SolverNode(TreeNode):
 
         # Create router.
         r = self.ant.new_router(self.in_shape)
-        s1 = SolverNode(self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes))
-        s2 = SolverNode(self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes))
+        s1 = SolverNode(
+            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes)
+        )
+        s2 = SolverNode(
+            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes)
+        )
         router_candidate = RouterNode(self.ant, r, s1, s2)
         if self.ant.router_inherit:
             s1.solver.load_state_dict(leaf_candidate.state_dict())
             s2.solver.load_state_dict(leaf_candidate.state_dict())
 
-        
-        multi_head_loss = lambda outputs, labels: sum(self.ant.loss_function(output_head, labels)
-                                                      for output_head in outputs)
+        multi_head_loss = lambda outputs, labels: sum(
+            self.ant.loss_function(output_head, labels) for output_head in outputs
+        )
 
         try:
             # Monkey-patch this nodes' solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
-            ops.train(self.ant.root, train_loader, multi_head_loss, self.ant.new_optimizer, max_expand_epochs,
-                      val_loader=val_loader, device=device, verbose=verbose)
-            val_losses = ops.eval(self.ant.root, val_loader, multi_head_loss, device=device)
+            ops.train(
+                self.ant.root,
+                train_loader,
+                multi_head_loss,
+                self.ant.new_optimizer,
+                max_expand_epochs,
+                val_loader=val_loader,
+                device=device,
+                verbose=verbose,
+            )
+            val_losses = ops.eval(
+                self.ant.root, val_loader, multi_head_loss, device=device
+            )
         finally:
             # Restore self.
             self.solver = leaf_candidate
@@ -270,7 +326,11 @@ class SolverNode(TreeNode):
         # Use best node.
         best = val_losses.argmin().item()
         if verbose:
-            print("Best choice was {} with respective losses {} for leaf/transformer/router.".format(["leaf", "transformer", "router"][best], val_losses))
+            print(
+                "Best choice was {} with respective losses {} for leaf/transformer/router.".format(
+                    ["leaf", "transformer", "router"][best], val_losses
+                )
+            )
         return [self, transformer_candidate, router_candidate][best]
 
     def forward(self, x):
