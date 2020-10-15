@@ -15,23 +15,32 @@ import random
 if __name__ == "__main__":
     random.seed(421)
 
-    # transform = torchvision.transforms.Compose(
-    #     [torchvision.transforms.ToTensor(),
+    transform = torchvision.transforms.Compose(
+        [torchvision.transforms.ToTensor()]
+    )
     #     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     #     torchvision.transforms.Lambda(torch.flatten)])
-    transform = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ]
-    )
 
-    trainset = torchvision.datasets.CIFAR10(
+    trainset = torchvision.datasets.MNIST(
         root="./data", train=True, download=True, transform=transform
     )
-    testset = torchvision.datasets.CIFAR10(
+    testset = torchvision.datasets.MNIST(
         root="./data", train=False, download=True, transform=transform
     )
+    num_classes = 10
+
+    # transform = torchvision.transforms.Compose(
+    #     [
+    #         torchvision.transforms.ToTensor(),
+    #         torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    #     ]
+    # )
+    # trainset = torchvision.datasets.CIFAR10(
+    #     root="./data", train=True, download=True, transform=transform
+    # )
+    # testset = torchvision.datasets.CIFAR10(
+    #     root="./data", train=False, download=True, transform=transform
+    # )
 
     # For quick debugging.
     # trainset = torch.utils.data.Subset(trainset, range(1024))
@@ -43,24 +52,12 @@ if __name__ == "__main__":
         testset, batch_size=16, shuffle=False, num_workers=1
     )
 
-    classes = (
-        "plane",
-        "car",
-        "bird",
-        "cat",
-        "deer",
-        "dog",
-        "frog",
-        "horse",
-        "ship",
-        "truck",
-    )
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
     t = ANT(
         in_shape=trainset[0][0].shape,
-        num_classes=len(classes),
+        num_classes=len(trainset.classes),
         new_router=functools.partial(
             Conv2DFCSigmoid, convolutions=1, kernels=40, kernel_size=5
         ),

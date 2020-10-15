@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
 class BinaryIndicator(torch.autograd.Function):
@@ -66,7 +67,34 @@ def depth_inc(x):
     """ Returns x + 1, respecting None as positive infinity. """
     return None if x is None else x + 1
 
+
+# https://discuss.pytorch.org/t/utility-function-for-calculating-the-shape-of-a-conv-output/11173/6
+def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+    """
+    Utility function for computing output of convolutions.
+    Takes a tuple of (h,w) and returns a tuple of (h,w).
+    """
+    
+    if type(h_w) is not tuple:
+        h_w = (h_w, h_w)
+    
+    if type(kernel_size) is not tuple:
+        kernel_size = (kernel_size, kernel_size)
+    
+    if type(stride) is not tuple:
+        stride = (stride, stride)
+    
+    if type(pad) is not tuple:
+        pad = (pad, pad)
+    
+    h = (h_w[0] + (2 * pad[0]) - (dilation * (kernel_size[0] - 1)) - 1)// stride[0] + 1
+    w = (h_w[1] + (2 * pad[1]) - (dilation * (kernel_size[1] - 1)) - 1)// stride[1] + 1
+    
+    return h, w
+
+
 def format_loss(loss):
+    """ Formats a loss value. """
     if isinstance(loss, float):
         return f"{loss:.5}"
     if isinstance(loss, torch.Tensor):
@@ -75,6 +103,7 @@ def format_loss(loss):
         if len(loss.shape) == 1:
             return "[" + ", ".join(f"{x:.5}" for x in loss) + "]"
     return str(loss)
+
 
 # Torch generic train/eval functions.
 def train(
@@ -112,11 +141,11 @@ def train(
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
+            epoch_loss += loss
             if len(loss.shape) == 1:
                 loss = torch.sum(loss)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item()
             n += len(data)
 
         epoch_loss /= n

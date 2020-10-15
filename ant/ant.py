@@ -105,20 +105,29 @@ class ANT:
 
             # Expand while possible.
             while not self.root.fully_expanded():
-                self.root = self.root.expand(
-                    train_loader,
-                    val_loader,
-                    max_expand_epochs,
-                    device=device,
-                    verbose=verbose,
-                )
+                try:
+                    old = self.state_dict()
 
-                # gc.collect()
-                # torch.cuda.empty_cache()
+                    self.root = self.root.expand(
+                        train_loader,
+                        val_loader,
+                        max_expand_epochs,
+                        device=device,
+                        verbose=verbose,
+                    )
+                
+                except RuntimeError as e:
+                    if "out of memory" in str(e):
+                        gc.collect()
+                        torch.cuda.empty_cache()
+                        self.load_state_dict(old)
+                        print("Recovered from out-of-memory error, stopping expansion process.")
+                        break
 
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
+
             self.root.set_frozen(False, recursive=True)
             ops.train(
                 self.root,

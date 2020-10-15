@@ -10,12 +10,14 @@ class Transformer(nn.Module):
         self.in_shape = in_shape
         self.out_shape = out_shape
 
+
 class IdentityTransformer(Transformer):
     def __init__(self, in_shape):
         super().__init__(in_shape, in_shape)
 
     def forward(self, x):
         return x
+
 
 class FullyConnected1DTransformer(Transformer):
     def __init__(self, in_shape):
