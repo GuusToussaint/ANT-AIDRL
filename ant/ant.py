@@ -115,13 +115,15 @@ class ANT:
                         device=device,
                         verbose=verbose,
                     )
-                
+
                 except RuntimeError as e:
                     if "out of memory" in str(e):
                         gc.collect()
                         torch.cuda.empty_cache()
                         self.load_state_dict(old)
-                        print("Recovered from out-of-memory error, stopping expansion process.")
+                        print(
+                            "Recovered from out-of-memory error, stopping expansion process."
+                        )
                         break
 
             # Final refinement.

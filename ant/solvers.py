@@ -28,7 +28,7 @@ class FullyConnectedSolver(Solver):
             self.model = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(np.prod(in_shape), num_classes),
-                nn.Softmax(dim=1)
+                nn.Softmax(dim=1),
             )
 
     def forward(self, x):

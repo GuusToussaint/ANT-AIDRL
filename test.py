@@ -1,6 +1,10 @@
 from ant import ANT
 from ant.routers import FullyConnectedSigmoidRouter, Conv2DFCSigmoid
-from ant.transformers import IdentityTransformer, FullyConnected1DTransformer, Conv2DRelu
+from ant.transformers import (
+    IdentityTransformer,
+    FullyConnected1DTransformer,
+    Conv2DRelu,
+)
 from ant.solvers import FullyConnectedSolver, Linear2DSolver
 
 import functools
@@ -15,9 +19,7 @@ import random
 if __name__ == "__main__":
     random.seed(421)
 
-    transform = torchvision.transforms.Compose(
-        [torchvision.transforms.ToTensor()]
-    )
+    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
     #     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     #     torchvision.transforms.Lambda(torch.flatten)])
 
@@ -54,7 +56,6 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
     t = ANT(
         in_shape=trainset[0][0].shape,
         num_classes=len(trainset.classes),
@@ -86,5 +87,3 @@ if __name__ == "__main__":
             correct += (predicted == labels).sum().item()
 
     print("Accuracy of the network : %d %%" % (100 * correct / total))
-
-
