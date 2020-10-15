@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from math import floor
 
 
 class Router(nn.Module):

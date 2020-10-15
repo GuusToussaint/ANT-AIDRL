@@ -1,12 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import random
 
 from . import ops
 from .ops import (
-    binary_indicator,
-    stochastic_binary_indicator,
+    # binary_indicator,
+    # stochastic_binary_indicator,
     depth_min,
     depth_inc,
     Stack,
@@ -81,7 +79,7 @@ class ANT:
         max_final_epochs,
         *,
         device="cpu",
-        verbose=True
+        verbose=True,
     ):
         self.training = True
 
@@ -134,6 +132,13 @@ class ANT:
         """ Returns (num_router, num_transformer, num_solver). """
         return self.root.get_tree_composition()
 
+    def state_dict(self):
+        return {"tree": self.root.tree_state_dict(), "params": self.root.state_dict()}
+
+    def load_state_dict(self, state_dict):
+        self.root = TreeNode.load_tree_state_dict(self, state_dict["tree"])
+        self.root.load_state_dict(state_dict["params"])
+
     def fit(self, X, y):
         raise NotImplementedError  # TODO, sklearn interface
 
@@ -155,6 +160,20 @@ class TreeNode(nn.Module):
     def get_tree_composition(self):
         raise NotImplementedError
 
+    def tree_state_dict(self):
+        raise NotImplementedError
+
+    @classmethod
+    def load_tree_state_dict(cls, ant, tree_state_dict):
+        if tree_state_dict["kind"] == "router":
+            return RouterNode.load_tree_state_dict(ant, tree_state_dict)
+        elif tree_state_dict["kind"] == "transformer":
+            return TransformerNode.load_tree_state_dict(ant, tree_state_dict)
+        elif tree_state_dict["kind"] == "solver":
+            return SolverNode.load_tree_state_dict(ant, tree_state_dict)
+        else:
+            raise RuntimeError("Unknown tree state kind")
+
     def expand(self):
         raise NotImplementedError
 
@@ -174,8 +193,28 @@ class RouterNode(TreeNode):
         )
         self.router = router
 
+    def tree_state_dict(self):
+        return {
+            "kind": "router",
+            "in_shape": self.in_shape,
+            "out_shape": self.out_shape,
+            "left_child": self.left_child.tree_state_dict(),
+            "right_child": self.right_child.tree_state_dict(),
+        }
+
+    @classmethod
+    def load_tree_state_dict(cls, ant, tree_state_dict):
+        assert tree_state_dict["kind"] == "router"
+        return cls(
+            ant,
+            ant.new_router(tree_state_dict["in_shape"]),
+            TreeNode.load_tree_state_dict(ant, tree_state_dict["left_child"]),
+            TreeNode.load_tree_state_dict(ant, tree_state_dict["right_child"]),
+        )
+
     def get_tree_composition(self):
         num_router, num_transformer, num_solver = self.left_child.get_tree_composition()
+        r = self.right_child.get_tree_composition()
         return (num_router + r[0] + 1, num_transformer + r[1], num_solver + r[2])
 
     def expand(self, *args, **kwargs):
@@ -236,6 +275,23 @@ class TransformerNode(TreeNode):
         self.unexpanded_depth = depth_inc(self.child.unexpanded_depth)
         self.transformer = transformer
 
+    def tree_state_dict(self):
+        return {
+            "kind": "transformer",
+            "in_shape": self.in_shape,
+            "out_shape": self.out_shape,
+            "child": self.child.tree_state_dict(),
+        }
+
+    @classmethod
+    def load_tree_state_dict(cls, ant, tree_state_dict):
+        assert tree_state_dict["kind"] == "transformer"
+        return cls(
+            ant,
+            ant.new_transformer(tree_state_dict["in_shape"]),
+            TreeNode.load_tree_state_dict(ant, tree_state_dict["child"]),
+        )
+
     def get_tree_composition(self):
         num_router, num_transformer, num_solver = self.child.get_tree_composition()
         return (num_router, num_transformer + 1, num_solver)
@@ -265,6 +321,18 @@ class SolverNode(TreeNode):
         super().__init__(ant, solver.in_shape, (1,))
         self.unexpanded_depth = 0
         self.solver = solver
+
+    def tree_state_dict(self):
+        return {
+            "kind": "solver",
+            "in_shape": self.in_shape,
+            "out_shape": self.out_shape,
+        }
+
+    @classmethod
+    def load_tree_state_dict(cls, ant, tree_state_dict):
+        assert tree_state_dict["kind"] == "solver"
+        return cls(ant, ant.new_solver(tree_state_dict["in_shape"], ant.num_classes))
 
     def get_tree_composition(self):
         return (0, 0, 1)
@@ -299,10 +367,9 @@ class SolverNode(TreeNode):
             s1.solver.load_state_dict(leaf_candidate.state_dict())
             s2.solver.load_state_dict(leaf_candidate.state_dict())
 
-        multi_head_loss = lambda outputs, labels: sum(
-            self.ant.loss_function(output_head, labels) for output_head in outputs
+        multi_head_loss = lambda outputs, labels: torch.stack(
+            [self.ant.loss_function(output_head, labels) for output_head in outputs]
         )
-
         try:
             # Monkey-patch this nodes' solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
@@ -328,7 +395,8 @@ class SolverNode(TreeNode):
         if verbose:
             print(
                 "Best choice was {} with respective losses {} for leaf/transformer/router.".format(
-                    ["leaf", "transformer", "router"][best], val_losses
+                    ["leaf", "transformer", "router"][best],
+                    "/".join(f"{loss:.5}" for loss in val_losses.tolist()),
                 )
             )
         return [self, transformer_candidate, router_candidate][best]

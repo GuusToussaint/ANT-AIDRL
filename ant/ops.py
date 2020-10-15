@@ -66,6 +66,12 @@ def depth_inc(x):
     """ Returns x + 1, respecting None as positive infinity. """
     return None if x is None else x + 1
 
+def format_loss(loss):
+    if isinstance(loss, float):
+        return f"{loss:.5}"
+    if len(loss.shape) == 1:
+        return "[" + ", ".join(f"{x:.5}" for x in loss) + "]"
+    return str(loss)
 
 # Torch generic train/eval functions.
 def train(
@@ -90,6 +96,7 @@ def train(
     no_improvement_epochs = 0
 
     optimizer = new_optimizer(model.parameters())
+    n = 0
     for epoch in range(max_epochs):
         model.train()
         epoch_loss = 0.0
@@ -102,22 +109,24 @@ def train(
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
+            if len(loss.shape) == 1:
+                loss = torch.sum(loss)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+            n += len(data)
 
-        epoch_loss /= len(train_loader)
+        epoch_loss /= n
 
         if val_loader and (verbose or patience is not None):
             val_loss = eval(model, val_loader, loss_function, device=device)
-            val_loss /= len(val_loader)
         else:
             val_loss = None
 
         if verbose:
-            out = "Epoch {}, train loss {:.5}".format(epoch + 1, epoch_loss)
+            out = "Epoch {}, train loss {}".format(epoch + 1, format_loss(epoch_loss))
             if val_loss is not None:
-                out += ", val loss {:.5}".format(val_loss)
+                out += ", val loss {}".format(format_loss(val_loss))
             print(out)
 
         if patience is not None:
@@ -135,6 +144,7 @@ def eval(model, data_loader, loss_function, *, device=None):
 
     model.eval()
     total = 0.0
+    n = 0
     for i, data in enumerate(data_loader):
         inputs, labels = data
         if device:
@@ -142,5 +152,7 @@ def eval(model, data_loader, loss_function, *, device=None):
 
         outputs = model(inputs)
         total += loss_function(outputs, labels)
+        n += len(data)
 
+    total /= n
     return total
