@@ -69,8 +69,11 @@ def depth_inc(x):
 def format_loss(loss):
     if isinstance(loss, float):
         return f"{loss:.5}"
-    if len(loss.shape) == 1:
-        return "[" + ", ".join(f"{x:.5}" for x in loss) + "]"
+    if isinstance(loss, torch.Tensor):
+        if len(loss.shape) == 0:
+            return f"{loss.item():.5}"
+        if len(loss.shape) == 1:
+            return "[" + ", ".join(f"{x:.5}" for x in loss) + "]"
     return str(loss)
 
 # Torch generic train/eval functions.
@@ -96,10 +99,10 @@ def train(
     no_improvement_epochs = 0
 
     optimizer = new_optimizer(model.parameters())
-    n = 0
     for epoch in range(max_epochs):
         model.train()
         epoch_loss = 0.0
+        n = 0
 
         for i, data in enumerate(train_loader):
             inputs, labels = data
@@ -145,14 +148,15 @@ def eval(model, data_loader, loss_function, *, device=None):
     model.eval()
     total = 0.0
     n = 0
-    for i, data in enumerate(data_loader):
-        inputs, labels = data
-        if device:
-            inputs, labels = inputs.to(device), labels.to(device)
+    with torch.no_grad():
+        for i, data in enumerate(data_loader):
+            inputs, labels = data
+            if device:
+                inputs, labels = inputs.to(device), labels.to(device)
 
-        outputs = model(inputs)
-        total += loss_function(outputs, labels)
-        n += len(data)
+            outputs = model(inputs)
+            loss = loss_function(outputs, labels)
+            total += loss
+            n += len(data)
 
-    total /= n
-    return total
+    return total / n

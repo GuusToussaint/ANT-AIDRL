@@ -14,16 +14,21 @@ class Solver(nn.Module):
         self.num_classes = num_classes
 
 
-class Linear1DSolver(Solver):
+class FullyConnectedSolver(Solver):
     def __init__(self, in_shape, num_classes):
         super().__init__(in_shape, num_classes)
-        # assert len(in_shape) == 1
 
         if num_classes == 1:
-            self.model = nn.Linear(in_shape[0], 1)
+            self.model = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(np.prod(in_shape), 1),
+            )
+
         else:
             self.model = nn.Sequential(
-                nn.Linear(np.prod(in_shape), num_classes), nn.Softmax(dim=1)
+                nn.Flatten(),
+                nn.Linear(np.prod(in_shape), num_classes),
+                nn.Softmax(dim=1)
             )
 
     def forward(self, x):

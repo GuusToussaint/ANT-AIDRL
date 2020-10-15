@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import gc
 
 from . import ops
 from .ops import (
@@ -97,6 +98,7 @@ class ANT:
                 self.loss_function,
                 self.new_optimizer,
                 max_expand_epochs,
+                val_loader=val_loader,
                 device=device,
                 verbose=verbose,
             )
@@ -111,6 +113,9 @@ class ANT:
                     verbose=verbose,
                 )
 
+                # gc.collect()
+                # torch.cuda.empty_cache()
+
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
@@ -121,6 +126,7 @@ class ANT:
                 self.loss_function,
                 self.new_optimizer,
                 max_expand_epochs,
+                val_loader=val_loader,
                 device=device,
                 verbose=verbose,
             )
