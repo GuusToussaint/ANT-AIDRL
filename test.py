@@ -56,6 +56,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
     t = ANT(
         in_shape=trainset[0][0].shape,
         num_classes=len(trainset.classes),

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+from . import ops
+
 
 class Router(nn.Module):
     """Given it's input outputs a scalar representing a probability
@@ -16,55 +18,49 @@ class Router(nn.Module):
 class FullyConnectedSigmoidRouter(Router):
     def __init__(self, in_shape):
         super().__init__(in_shape)
-        # assert len(in_shape) == 1
-        self.model = nn.Sequential(nn.Linear(np.prod(in_shape), 1), nn.Sigmoid())
+        self.model = nn.Sequential(nn.Flatten(),
+                                   nn.Linear(np.prod(in_shape), 1),
+                                   nn.Sigmoid())
 
     def forward(self, x):
-        return self.model(torch.flatten(x, start_dim=1))
+        return self.model(x)
 
 
-class Conv2DFCSigmoid(Router):
-    def __init__(
-        self,
-        in_shape,
-        convolutions=1,
-        fully_connected=1,
-        kernels=40,
-        kernel_size=5,
-        pad=0,
-        dilation=1,
-        stride=1,
-    ):
-        # TODO: only works with square images
-        in_shapes = [in_shape[0]]
-        for convolution in range(convolutions):
-            if convolution > 0:
-                in_shapes.append(kernels)
+class Conv2DGAPFCSigmoidRouter(Router):
+    def __init__(self, in_shape, *, convolutions, kernel_size, kernels, fc_layers, fc_reduction=2):
         super().__init__(in_shape)
 
-        self.model = nn.Sequential()
-        for convolution in range(convolutions):
+        # Convolutional layers.
+        shape = in_shape
+        modules = []
+        for i in range(convolutions):
             conv = nn.Conv2d(
-                in_channels=in_shapes[convolution],
+                in_channels=shape[0],
                 out_channels=kernels,
                 kernel_size=kernel_size,
-                padding=pad,
-                dilation=dilation,
-                stride=stride,
             )
-            self.model.add_module("conv %i" % (convolution + 1), conv)
-            self.model.add_module("ReLU %i" % (convolution + 1), nn.ReLU(inplace=True))
-        self.model.add_module("GAP", nn.AdaptiveAvgPool2d(1))
-        self.model.add_module("Flatten", nn.Flatten())
-        for fully_connect in range(fully_connected):
-            if fully_connect == fully_connected - 1:
-                self.model.add_module("FC %i" % fully_connect, nn.Linear(kernels, 1))
+            modules.append(conv)
+
+            shape = (kernels,) + ops.conv_output_shape(shape[1:3], kernel_size)
+            if i != convolutions - 1 or fc_layers > 0:
+                modules.append(nn.ReLU())
+
+        # Global average pooling.
+        modules.append(nn.AdaptiveAvgPool2d(1))
+        modules.append(nn.Flatten())
+
+        # Fully connected layers.
+        neurons = shape[0]
+        for i in range(fc_layers):
+            if i != fc_layers - 1:
+                modules.append(nn.Linear(neurons, 1 + neurons // fc_reduction))
+                modules.append(nn.ReLU())
+                neurons = 1 + neurons // fc_reduction
             else:
-                self.model.add_module(
-                    "FC %i" % fully_connect, nn.Linear(kernels, kernels)
-                )
-        self.model.add_module("Sigmoid", nn.Sigmoid())
+                modules.append(nn.Linear(neurons, 1)
+
+        modules.append(nn.Sigmoid())
+        self.model = nn.Sequential(modules)
 
     def forward(self, x):
-        out = self.model(x)
-        return out
+        return self.model(x)
