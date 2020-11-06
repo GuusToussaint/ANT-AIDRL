@@ -40,7 +40,7 @@ if __name__ == "__main__":
             Conv2DGAPFCSigmoidRouter, convolutions=1, kernels=40, kernel_size=5, fc_layers=2
         ),
         new_transformer=functools.partial(
-            Conv2DRelu, convolutions=1, kernels=40, kernel_size=5
+            Conv2DRelu, convolutions=1, kernels=40, kernel_size=5, down_sample_freq=1
         ),
         new_solver=FullyConnectedSolver,
         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape),

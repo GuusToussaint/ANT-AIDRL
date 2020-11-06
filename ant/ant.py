@@ -94,7 +94,7 @@ class ANT:
 
             # Create initial leaf and train it.
             self.root = SolverNode(
-                self, self.new_solver(self.in_shape, self.num_classes)
+                self, self.new_solver(self.in_shape, self.num_classes), 0
             )
             ops.train(
                 self.root,
@@ -159,8 +159,14 @@ class ANT:
         def create_tree(dict, count):
             count += 1
             new_count = count
+            label = dict['kind']
             id = str(count)
-            dot.node(id, dict['kind'])
+
+            label += f' {dict["in_shape"]} '
+            if dict['kind'] == 'transformer':
+                label += f'- {dict["transformer_count"]}'
+
+            dot.node(id, label)
             if dict['kind'] == 'router':
                 left, root_id, new_count = create_tree(dict['left_child'], new_count)
                 dot.edge(id, str(root_id))
@@ -218,12 +224,13 @@ class ANT:
 
 
 class TreeNode(nn.Module):
-    def __init__(self, ant, in_shape, out_shape):
+    def __init__(self, ant, in_shape, out_shape, transformer_count):
         super().__init__()
         self.ant = ant
         self.unexpanded_depth = None
         self.in_shape = in_shape
         self.out_shape = out_shape
+        self.transformer_count = transformer_count
 
     def fully_expanded(self):
         return self.unexpanded_depth is None
@@ -253,8 +260,8 @@ class TreeNode(nn.Module):
 
 
 class RouterNode(TreeNode):
-    def __init__(self, ant, router, left_child, right_child):
-        super().__init__(ant, router.in_shape, router.in_shape)
+    def __init__(self, ant, router, left_child, right_child, transformer_count):
+        super().__init__(ant, router.in_shape, router.in_shape, transformer_count)
         self.left_child = left_child
         self.right_child = right_child
         self.unexpanded_depth = depth_inc(
@@ -340,8 +347,8 @@ class RouterNode(TreeNode):
 
 
 class TransformerNode(TreeNode):
-    def __init__(self, ant, transformer, child):
-        super().__init__(ant, transformer.in_shape, transformer.out_shape)
+    def __init__(self, ant, transformer, child, transformer_count):
+        super().__init__(ant, transformer.in_shape, transformer.out_shape, transformer_count)
         self.child = child
         self.unexpanded_depth = depth_inc(self.child.unexpanded_depth)
         self.transformer = transformer
@@ -352,6 +359,7 @@ class TransformerNode(TreeNode):
             "in_shape": self.in_shape,
             "out_shape": self.out_shape,
             "child": self.child.tree_state_dict(),
+            "transformer_count": self.transformer_count,
         }
 
     @classmethod
@@ -388,8 +396,8 @@ class TransformerNode(TreeNode):
 
 
 class SolverNode(TreeNode):
-    def __init__(self, ant, solver):
-        super().__init__(ant, solver.in_shape, (1,))
+    def __init__(self, ant, solver, transformer_count):
+        super().__init__(ant, solver.in_shape, (1,), transformer_count)
         self.unexpanded_depth = 0
         self.solver = solver
 
@@ -419,21 +427,21 @@ class SolverNode(TreeNode):
         leaf_candidate = self.solver
 
         # Create transformer.
-        t = self.ant.new_transformer(self.in_shape)
-        s = SolverNode(self.ant, self.ant.new_solver(t.out_shape, self.ant.num_classes))
-        transformer_candidate = TransformerNode(self.ant, t, s)
+        t = self.ant.new_transformer(self.in_shape, self.transformer_count)
+        s = SolverNode(self.ant, self.ant.new_solver(t.out_shape, self.ant.num_classes), self.transformer_count+1)
+        transformer_candidate = TransformerNode(self.ant, t, s, self.transformer_count)
         if self.ant.transformer_inherit:
             s.solver.load_state_dict(leaf_candidate.state_dict())
 
         # Create router.
         r = self.ant.new_router(self.in_shape)
         s1 = SolverNode(
-            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes)
+            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes), self.transformer_count
         )
         s2 = SolverNode(
-            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes)
+            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes), self.transformer_count
         )
-        router_candidate = RouterNode(self.ant, r, s1, s2)
+        router_candidate = RouterNode(self.ant, r, s1, s2, self.transformer_count)
         if self.ant.router_inherit:
             s1.solver.load_state_dict(leaf_candidate.state_dict())
             s2.solver.load_state_dict(leaf_candidate.state_dict())
