@@ -1,6 +1,43 @@
+from typing import Any
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset
+import numpy as np
 
+
+# https://github.com/PyTorchLightning/PyTorch-Lightning-Bolts/blob/master/pl_bolts/datamodules/sklearn_datamodule.py#L19-L63
+class SklearnDataset(Dataset):
+    """
+    Mapping between numpy (or sklearn) datasets to PyTorch datasets.
+    """
+    def __init__(self, X: np.ndarray, y: np.ndarray, X_transform: Any = None, y_transform: Any = None):
+        """
+        Args:
+            X: Numpy ndarray
+            y: Numpy ndarray
+            X_transform: Any transform that works with Numpy arrays
+            y_transform: Any transform that works with Numpy arrays
+        """
+        super().__init__()
+        self.X = X
+        self.Y = y
+        self.X_transform = X_transform
+        self.y_transform = y_transform
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        x = self.X[idx]
+        y = self.Y[idx]
+
+        if self.X_transform:
+            x = self.X_transform(x)
+
+        if self.y_transform:
+            y = self.y_transform(y)
+
+        return x, y
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
@@ -117,6 +154,8 @@ def train(
     val_loader=None,
     patience=None,
     verbose=False,
+    refinement=False,
+    lr_factor=0.1
 ):
     if device:
         model.to(device)
@@ -162,10 +201,18 @@ def train(
             print(out)
 
         if patience is not None:
+            if len(val_loss.shape) == 1:
+                val_loss = torch.sum(val_loss)
             if val_loss >= last_val_loss:
                 no_improvement_epochs += 1
             if no_improvement_epochs > patience:
                 break
+
+        if epoch+1%50 == 0 and refinement:
+            print("changing learning rate")
+            for param_group in optimizer.param_groups:
+                old_lr = param_group['lr']
+                param_group['lr'] = old_lr * lr_factor
 
         last_val_loss = val_loss
 

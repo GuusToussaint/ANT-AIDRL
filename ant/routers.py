@@ -18,16 +18,18 @@ class Router(nn.Module):
 class FullyConnectedSigmoidRouter(Router):
     def __init__(self, in_shape):
         super().__init__(in_shape)
-        self.model = nn.Sequential(nn.Flatten(),
-                                   nn.Linear(np.prod(in_shape), 1),
-                                   nn.Sigmoid())
+        self.model = nn.Sequential(
+            nn.Flatten(), nn.Linear(np.prod(in_shape), 1), nn.Sigmoid()
+        )
 
     def forward(self, x):
         return self.model(x)
 
 
 class Conv2DGAPFCSigmoidRouter(Router):
-    def __init__(self, in_shape, *, convolutions, kernel_size, kernels, fc_layers, fc_reduction=2):
+    def __init__(
+        self, in_shape, *, convolutions, kernel_size, kernels, fc_layers, fc_reduction=2
+    ):
         super().__init__(in_shape)
 
         # Convolutional layers.
@@ -41,7 +43,7 @@ class Conv2DGAPFCSigmoidRouter(Router):
             )
             modules.append(conv)
 
-            shape = (kernels,) + ops.conv_output_shape(shape[1:3], kernel_size)
+            shape = (kernels,) + ops.conv_output_shape(tuple(shape[1:3]), kernel_size)
             if i != convolutions - 1 or fc_layers > 0:
                 modules.append(nn.ReLU())
 
@@ -57,10 +59,9 @@ class Conv2DGAPFCSigmoidRouter(Router):
                 modules.append(nn.ReLU())
                 neurons = 1 + neurons // fc_reduction
             else:
-                modules.append(nn.Linear(neurons, 1)
-
+                modules.append(nn.Linear(neurons, 1))
         modules.append(nn.Sigmoid())
-        self.model = nn.Sequential(modules)
+        self.model = nn.Sequential(*modules)
 
     def forward(self, x):
         return self.model(x)

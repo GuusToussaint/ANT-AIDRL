@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
+from graphviz import Digraph
+from torch.utils.data import TensorDataset, DataLoader, random_split
+from torch import Tensor
 import gc
+import numpy as np
 
 from . import ops
 from .ops import (
@@ -14,17 +18,17 @@ from .ops import (
 
 class ANT:
     def __init__(
-        self,
-        in_shape,
-        num_classes,
-        new_router,
-        new_transformer,
-        new_solver,
-        new_optimizer,
-        soft_decision=True,
-        stochastic=False,
-        router_inherit=True,
-        transformer_inherit=False,
+            self,
+            in_shape,
+            num_classes,
+            new_router,
+            new_transformer,
+            new_solver,
+            new_optimizer,
+            soft_decision=True,
+            stochastic=False,
+            router_inherit=True,
+            transformer_inherit=False,
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
@@ -73,14 +77,14 @@ class ANT:
             self.loss_function = lambda pred, target: nll_loss(torch.log(pred), target)
 
     def do_train(
-        self,
-        train_loader,
-        val_loader,
-        max_expand_epochs,
-        max_final_epochs,
-        *,
-        device="cpu",
-        verbose=True,
+            self,
+            train_loader,
+            val_loader,
+            max_expand_epochs,
+            max_final_epochs,
+            *,
+            device="cpu",
+            verbose=True,
     ):
         self.training = True
 
@@ -101,8 +105,8 @@ class ANT:
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
+                patience=5
             )
-
             # Expand while possible.
             while not self.root.fully_expanded():
                 try:
@@ -126,6 +130,9 @@ class ANT:
                         )
                         break
 
+            # Create the graphviz
+            self.create_graphviz()
+
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
@@ -136,14 +143,38 @@ class ANT:
                 train_loader,
                 self.loss_function,
                 self.new_optimizer,
-                max_expand_epochs,
+                max_final_epochs,
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
+                refinement=True
             )
 
         finally:
             self.training = False
+
+    def create_graphviz(self):
+        dot = Digraph(comment="Tree structure of trained ANT")
+
+        def create_tree(dict, count):
+            count += 1
+            new_count = count
+            id = str(count)
+            dot.node(id, dict['kind'])
+            if dict['kind'] == 'router':
+                left, root_id, new_count = create_tree(dict['left_child'], new_count)
+                dot.edge(id, str(root_id))
+
+                right, root_id, new_count = create_tree(dict['right_child'], new_count)
+                dot.edge(id, str(root_id))
+            elif dict['kind'] == 'transformer':
+                child, root_id, new_count = create_tree(dict['child'], new_count)
+                dot.edge(id, str(root_id))
+
+            return dict, count, new_count
+
+        create_tree(self.state_dict()['tree'], 0)
+        dot.render('ANT-output/ANT-structure.gv', view=False)
 
     def get_tree_composition(self):
         """ Returns (num_router, num_transformer, num_solver). """
@@ -156,8 +187,31 @@ class ANT:
         self.root = TreeNode.load_tree_state_dict(self, state_dict["tree"])
         self.root.load_state_dict(state_dict["params"])
 
-    def fit(self, X, y):
-        raise NotImplementedError  # TODO, sklearn interface
+    def fit(self, dataset, batch_size=512, verbose=True, max_expand_epochs=100, max_final_epochs=200,
+            transform=None):
+        # dataset = ops.SklearnDataset(X, y, X_transform=transform)
+
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        val_instances = int(len(dataset) * 0.1)
+        trainset, valset = random_split(dataset, [len(dataset) - val_instances, val_instances],
+                                        generator=torch.Generator())
+        trainloader = torch.utils.data.DataLoader(
+            trainset, batch_size=batch_size, shuffle=True, num_workers=0
+        )
+        valloader = torch.utils.data.DataLoader(
+            valset, batch_size=batch_size, shuffle=True, num_workers=0
+        )
+
+        if verbose:
+            print(f'fitting model with {len(trainset)} training instances and {len(valset)} validation instances')
+
+        self.do_train(
+            trainloader,
+            valloader,
+            max_expand_epochs=max_expand_epochs,
+            max_final_epochs=max_final_epochs,
+            device=device
+        )
 
     def predict(self, X, y):
         raise NotImplementedError  # TODO, sklearn interface
@@ -387,6 +441,7 @@ class SolverNode(TreeNode):
         multi_head_loss = lambda outputs, labels: torch.stack(
             [self.ant.loss_function(output_head, labels) for output_head in outputs]
         )
+
         try:
             # Monkey-patch this nodes' solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
@@ -399,10 +454,13 @@ class SolverNode(TreeNode):
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
+                patience=5
             )
             val_losses = ops.eval(
                 self.ant.root, val_loader, multi_head_loss, device=device
             )
+        except Exception as e:
+            print(f'error message: {e}')
         finally:
             # Restore self.
             self.solver = leaf_candidate
