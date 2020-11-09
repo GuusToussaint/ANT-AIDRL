@@ -2,10 +2,10 @@ from ant import ANT
 from ant.routers import FullyConnectedSigmoidRouter, Conv2DGAPFCSigmoidRouter
 from ant.transformers import (
     IdentityTransformer,
-    FullyConnected1DTransformer,
+    FullyConnectedTransformer,
     Conv2DRelu,
 )
-from ant.solvers import FullyConnectedSolver
+from ant.solvers import LinearClassifier
 from sklearn.datasets import fetch_openml
 import functools
 import torchvision
@@ -24,10 +24,12 @@ if __name__ == "__main__":
 
 
     trainset = torchvision.datasets.MNIST(
-        root="./data", train=True, download=True, transform=transform
+        root="./data", train=True, download=True, transform=transform,
+        target_transform=torchvision.transforms.ToTensor()
     )
     testset = torchvision.datasets.MNIST(
-        root="./data", train=False, download=True, transform=transform
+        root="./data", train=False, download=True, transform=transform,
+        target_transform=torchvision.transforms.ToTensor()
     )
 
     # hold out 10% for the validation set
@@ -42,11 +44,11 @@ if __name__ == "__main__":
         new_transformer=functools.partial(
             Conv2DRelu, convolutions=1, kernels=40, kernel_size=5, down_sample_freq=1
         ),
-        new_solver=FullyConnectedSolver,
+        new_solver=LinearClassifier,
         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape),
     )
 
-    t.fit(trainset, transform=transform)
+    t.fit(trainset, transform=transform, max_expand_epochs=1, max_final_epochs=50)
 
 
 

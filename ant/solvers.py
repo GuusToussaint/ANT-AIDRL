@@ -14,38 +14,33 @@ class Solver(nn.Module):
         self.num_classes = num_classes
 
 
-class FullyConnectedSolver(Solver):
-    def __init__(self, in_shape, num_classes):
+class LinearClassifier(Solver):
+    def __init__(self, in_shape, num_classes, GAP=False):
         super().__init__(in_shape, num_classes)
+        assert self.num_classes > 1
 
-        if num_classes == 1:
-            self.model = nn.Sequential(
-                nn.Flatten(),
-                nn.Linear(np.prod(in_shape), 1),
-            )
+        nodes = np.prod(in_shape) if not GAP else in_shape[0]
 
-        else:
-            self.model = nn.Sequential(
-                nn.Flatten(),
-                nn.Linear(np.prod(in_shape), num_classes),
-                nn.Softmax(dim=1),
-            )
+        modules = []
+        if GAP:
+            modules.append(nn.AdaptiveAvgPool2d(1))
+        modules.append(nn.Flatten())
+        modules.append(nn.Linear(nodes, num_classes))
+        modules.append(nn.LogSoftmax(dim=1))
+        self.model = nn.Sequential(*modules)
 
     def forward(self, x):
         return self.model(x)
 
 
-class Linear2DSolver(Solver):
+class LinearRegressor(Solver):
     def __init__(self, in_shape, num_classes):
         super().__init__(in_shape, num_classes)
-        # assert len(in_shape) == 2
+        assert self.num_classes == 1
+        nodes = np.prod(in_shape)
 
-        if num_classes == 1:
-            self.model = nn.Linear(in_shape[0], 1)
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(np.prod(in_shape), num_classes), nn.Softmax(dim=1)
-            )
+        modules = [nn.Flatten(), nn.Linear(nodes, num_classes)]
+        self.model(nn.Sequential(*modules))
 
     def forward(self, x):
-        return self.model(torch.flatten(x, start_dim=1))
+        return self.model(x)

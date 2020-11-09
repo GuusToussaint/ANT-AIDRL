@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 import numpy as np
+from math import floor
 
 
 # https://github.com/PyTorchLightning/PyTorch-Lightning-Bolts/blob/master/pl_bolts/datamodules/sklearn_datamodule.py#L19-L63
@@ -124,8 +125,10 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     if type(pad) is not tuple:
         pad = (pad, pad)
 
-    h = (h_w[0] + (2 * pad[0]) - (dilation * (kernel_size[0] - 1)) - 1) // stride[0] + 1
-    w = (h_w[1] + (2 * pad[1]) - (dilation * (kernel_size[1] - 1)) - 1) // stride[1] + 1
+    h = floor( ((h_w[0] + (2 * pad[0]) - ( dilation * (kernel_size[0] - 1) ) - 1 )/ stride[0]) + 1)
+    w = floor( ((h_w[1] + (2 * pad[1]) - ( dilation * (kernel_size[1] - 1) ) - 1 )/ stride[1]) + 1)
+
+    assert h != 0 and w != 0
 
     return h, w
 
@@ -174,6 +177,10 @@ def train(
 
         for i, data in enumerate(train_loader):
             inputs, labels = data
+            if torch.isnan(torch.sum(inputs)) or torch.isinf(torch.sum(inputs)):
+                print("INPUTS ARE NAN")
+                break
+
             if device:
                 inputs, labels = inputs.to(device), labels.to(device)
 

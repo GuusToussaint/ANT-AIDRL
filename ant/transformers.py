@@ -18,17 +18,14 @@ class IdentityTransformer(Transformer):
         return x
 
 
-class FullyConnected1DTransformer(Transformer):
-    def __init__(self, in_shape):
-        super().__init__(in_shape, in_shape)
+class FullyConnectedTransformer(Transformer):
+    def __init__(self, in_shape, fc_reduction=2):
+        super().__init__(in_shape, in_shape, )
         # assert len(in_shape) == 1
 
-        # TODO make this parametrizable
         self.model = nn.Sequential(
-            nn.Linear(in_shape[0], 50),
-            nn.ReLU(),
-            nn.Linear(50, in_shape[0]),
-            nn.ReLU(),
+            nn.Linear(in_shape[0], in_shape[1] // fc_reduction),
+            nn.Tanh(),
         )
 
     def forward(self, x):
@@ -54,7 +51,11 @@ class Conv2DRelu(Transformer):
         for _ in range(convolutions):
             current_shape = ops.conv_output_shape(current_shape, kernel_size=kernel_size)
         if downsample:
-            current_shape = ops.conv_output_shape(current_shape, kernel_size=(2,2), stride=2)
+            current_shape = (
+                floor(((i + 2 * 0 - 1 * (2 - 1)) / 2) + 1)
+                for i in current_shape
+            )
+
         out_shape = (kernels, *current_shape)
 
         super().__init__(in_shape, out_shape)

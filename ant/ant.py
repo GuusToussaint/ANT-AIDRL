@@ -74,7 +74,7 @@ class ANT:
             self.loss_function = nn.MSELoss()
         else:
             nll_loss = nn.NLLLoss()
-            self.loss_function = lambda pred, target: nll_loss(torch.log(pred), target)
+            self.loss_function = lambda pred, target: nll_loss(pred, target)
 
     def do_train(
             self,
@@ -219,8 +219,25 @@ class ANT:
             device=device
         )
 
-    def predict(self, X, y):
-        raise NotImplementedError  # TODO, sklearn interface
+    def eval(self, dataset, batch_size=16):
+        testloader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=0
+        )
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        total = 0
+        correct = 0
+        with torch.no_grad():
+            self.root.eval()
+            self.root.to(device)
+            for data in testloader:
+                inputs, labels = data[0].to(device), data[1].to(device)
+                outputs = self.root(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        print("Accuracy of the network : %f %%" % (100 * correct / total))
+        print(f'total {total}, correct {correct}, wrong {total-correct}')
 
 
 class TreeNode(nn.Module):
@@ -426,6 +443,10 @@ class SolverNode(TreeNode):
         # Use pre-trained existing leaf.
         leaf_candidate = self.solver
 
+        # check if width is greater than kernel size
+        if self.in_shape[1] < self.ant.new_transformer.keywords['kernel_size']:
+            return self
+
         # Create transformer.
         t = self.ant.new_transformer(self.in_shape, self.transformer_count)
         s = SolverNode(self.ant, self.ant.new_solver(t.out_shape, self.ant.num_classes), self.transformer_count+1)
@@ -467,6 +488,7 @@ class SolverNode(TreeNode):
             val_losses = ops.eval(
                 self.ant.root, val_loader, multi_head_loss, device=device
             )
+            print()
         except Exception as e:
             print(f'error message: {e}')
         finally:
@@ -475,6 +497,11 @@ class SolverNode(TreeNode):
 
         # Use best node.
         best = val_losses.argmin().item()
+        print(val_losses[val_losses.argmin().item()], val_losses[val_losses.argmax().item()])
+        if val_losses[val_losses.argmin().item()] == val_losses[val_losses.argmax().item()]:
+            print("all the same, choosing leaf")
+            best = 0
+
         if verbose:
             print(
                 "Best choice was {} with respective losses {} for leaf/transformer/router.".format(
