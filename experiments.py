@@ -115,7 +115,6 @@ def presets(preset, in_shape, num_classes):
 
 
 if __name__ == "__main__":
-    random.seed(421)
     # MNIST dataset
     print("Starting experiments for ANT-MNIST-C")
 
