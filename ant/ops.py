@@ -215,7 +215,7 @@ def train(
             if no_improvement_epochs > patience:
                 break
 
-        if epoch+1%50 == 0 and refinement:
+        if (epoch+1) % 50 == 0 and refinement:
             print("changing learning rate")
             for param_group in optimizer.param_groups:
                 old_lr = param_group['lr']

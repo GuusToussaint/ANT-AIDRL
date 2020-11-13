@@ -15,6 +15,7 @@ from torch.utils.data import random_split
 import functools
 import torchvision
 import torch
+import random
 
 
 # Function for returning the ANT with correct parameters for presets
@@ -114,7 +115,7 @@ def presets(preset, in_shape, num_classes):
 
 
 if __name__ == "__main__":
-
+    random.seed(421)
     # MNIST dataset
     print("Starting experiments for ANT-MNIST-C")
 
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     )
     num_classes = 10
     in_shape = trainset[0][0].shape
-    tree = presets("ANT-MNIST-A", in_shape, num_classes)
+    tree = presets("ANT-MNIST-C", in_shape, num_classes)
 
     tree.fit(trainset, max_expand_epochs=100, max_final_epochs=100)
 

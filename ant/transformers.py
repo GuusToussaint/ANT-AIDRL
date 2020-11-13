@@ -44,7 +44,7 @@ class Conv2DRelu(Transformer):
     ):
         downsample = False
         # Getting the ouput shape
-        if prev_transformers+1%down_sample_freq == 0:
+        if (prev_transformers+1) % down_sample_freq == 0:
             downsample = True
 
         current_shape = tuple(in_shape[1:3])
@@ -55,7 +55,6 @@ class Conv2DRelu(Transformer):
                 floor(((i + 2 * 0 - 1 * (2 - 1)) / 2) + 1)
                 for i in current_shape
             )
-
         out_shape = (kernels, *current_shape)
 
         super().__init__(in_shape, out_shape)

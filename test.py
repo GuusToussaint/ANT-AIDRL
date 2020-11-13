@@ -17,8 +17,6 @@ import random
 if __name__ == "__main__":
     random.seed(421)
 
-
-
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
         torchvision.transforms.Normalize((0.5), (0.5))])
 
