@@ -32,6 +32,7 @@ class Conv2DGAPFCSigmoidRouter(Router):
     ):
         super().__init__(in_shape)
 
+        kernel_size = min((kernel_size,) + in_shape[1:3])
         # Convolutional layers.
         shape = in_shape
         modules = []

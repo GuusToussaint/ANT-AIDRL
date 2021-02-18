@@ -5,6 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 from torch import Tensor
 import gc
 import numpy as np
+import random
 
 from . import ops
 from .ops import (
@@ -120,6 +121,9 @@ class ANT:
                         verbose=verbose,
                     )
 
+                    # Create the graphviz
+                    self.create_graphviz()
+
                 except RuntimeError as e:
                     if "out of memory" in str(e):
                         gc.collect()
@@ -130,8 +134,7 @@ class ANT:
                         )
                         break
 
-            # Create the graphviz
-            self.create_graphviz()
+
 
             # Final refinement.
             if verbose:
@@ -339,20 +342,15 @@ class RouterNode(TreeNode):
         if self.ant.soft_decision or self.ant.training:
             return p * self.left_child(x) + (1 - p) * self.right_child(x)
 
-        raise NotImplementedError
+        if self.ant.stochastic:
+            random_value = random.random()
+        else:
+            random_value = 0.5
 
-        # FIXME: implement single-path routing?
-        # if self.ant.stochastic:
-        #     ind = stochastic_binary_indicator(p)
-        # else:
-        #     ind = binary_indicator(p)
-
-        # o = x.new_empty(x.size())
-        # left_mask = ind > 0.5
-        # right_mask = ~ind
-        # o[left_mask] = self.left_child(x[left_mask])
-        # o[right_mask] = self.right_child(x[right_mask])
-        # return o
+        if random_value < p:
+            return self.right_child(x)
+        else:
+            return self.left_child_child(x)
 
     def set_frozen(self, frozen, recursive=False):
         for param in self.router.parameters():
@@ -443,10 +441,6 @@ class SolverNode(TreeNode):
         # Use pre-trained existing leaf.
         leaf_candidate = self.solver
 
-        # check if width is greater than kernel size
-        if self.in_shape[1] < self.ant.new_transformer.keywords['kernel_size']:
-            return self
-
         # Create transformer.
         t = self.ant.new_transformer(self.in_shape, self.transformer_count)
         s = SolverNode(self.ant, self.ant.new_solver(t.out_shape, self.ant.num_classes), self.transformer_count+1)
@@ -497,9 +491,9 @@ class SolverNode(TreeNode):
 
         # Use best node.
         best = val_losses.argmin().item()
-        print(val_losses[val_losses.argmin().item()], val_losses[val_losses.argmax().item()])
-        if val_losses[val_losses.argmin().item()] == val_losses[val_losses.argmax().item()]:
-            print("all the same, choosing leaf")
+        if round(val_losses[val_losses.argmin().item()].item(), 5) == \
+                round(val_losses[val_losses.argmax().item()].item(), 5):
+            # No 'real' difference, thus choosing lead as best
             best = 0
 
         if verbose:

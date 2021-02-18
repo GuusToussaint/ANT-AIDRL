@@ -43,9 +43,16 @@ class Conv2DRelu(Transformer):
         down_sample_freq=1
     ):
         downsample = False
+
+
         # Getting the ouput shape
         if (prev_transformers+1) % down_sample_freq == 0:
             downsample = True
+
+        _old_kernel_size = kernel_size
+        kernel_size = min((kernel_size,) + in_shape[1:3])
+        if _old_kernel_size != kernel_size:
+            downsample = False
 
         current_shape = tuple(in_shape[1:3])
         for _ in range(convolutions):

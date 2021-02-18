@@ -116,7 +116,7 @@ def presets(preset, in_shape, num_classes):
 
 if __name__ == "__main__":
     # MNIST dataset
-    print("Starting experiments for ANT-MNIST-C")
+    print("Starting experiments for ANT-MNIST-A multi path test")
 
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
                                                 torchvision.transforms.Normalize((0.5), (0.5))])
@@ -124,15 +124,17 @@ if __name__ == "__main__":
     trainset = torchvision.datasets.MNIST(
         root="./data", train=True, download=True, transform=transform
     )
-    sample_size = 10000
+    sample_size = len(trainset)
+    # sample_size = 1000
     trainset, _ = random_split(trainset, [sample_size, len(trainset)-sample_size])
 
     testset = torchvision.datasets.MNIST(
         root="./data", train=False, download=True, transform=transform
     )
+
     num_classes = 10
     in_shape = trainset[0][0].shape
-    tree = presets("ANT-MNIST-C", in_shape, num_classes)
+    tree = presets("ANT-MNIST-A", in_shape, num_classes)
 
     tree.fit(trainset, max_expand_epochs=100, max_final_epochs=100)
 
