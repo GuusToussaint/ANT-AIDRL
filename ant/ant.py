@@ -449,7 +449,8 @@ class SolverNode(TreeNode):
         # Mark leaf as expanded.
         self.unexpanded_depth = None
 
-        # Use pre-trained existing leaf.
+        # Use pre-trained existing leaf (but don't re-train it).
+        self.set_frozen(True)
         leaf_candidate = self.solver
 
         # Create transformer.
@@ -504,17 +505,11 @@ class SolverNode(TreeNode):
         except Exception as e:
             print(f"error message: {e}")
         finally:
-            # Restore self.
+            # Restore self always.
             self.solver = leaf_candidate
 
         # Use best node.
         best = val_losses.argmin().item()
-        if round(val_losses[val_losses.argmin().item()].item(), 5) == round(
-            val_losses[val_losses.argmax().item()].item(), 5
-        ):
-            # No 'real' difference, thus choosing lead as best
-            best = 0
-
         if verbose:
             print(
                 "Best choice was {} with respective losses {} for leaf/transformer/router.".format(
