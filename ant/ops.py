@@ -1,9 +1,6 @@
 from typing import Any
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
-import numpy as np
-from math import floor
 
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
@@ -91,11 +88,11 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     if type(pad) is not tuple:
         pad = (pad, pad)
 
-    h = floor(
+    h = int(
         ((h_w[0] + (2 * pad[0]) - (dilation * (kernel_size[0] - 1)) - 1) / stride[0])
         + 1
     )
-    w = floor(
+    w = int(
         ((h_w[1] + (2 * pad[1]) - (dilation * (kernel_size[1] - 1)) - 1) / stride[1])
         + 1
     )
@@ -129,8 +126,7 @@ def train(
     val_loader=None,
     patience=None,
     verbose=False,
-    refinement=False,
-    lr_factor=0.1,
+    lr_factor=None,
 ):
     if device:
         model.to(device)
@@ -150,6 +146,7 @@ def train(
         for i, data in enumerate(train_loader):
             inputs, labels = data
             if torch.isnan(torch.sum(inputs)) or torch.isinf(torch.sum(inputs)):
+                # FIXME: remove this.
                 print("INPUTS ARE NAN")
                 break
 
@@ -187,8 +184,8 @@ def train(
             if no_improvement_epochs > patience:
                 break
 
-        if (epoch + 1) % 50 == 0 and refinement:
-            print("changing learning rate")
+        if (epoch + 1) % 50 == 0 and lr_factor is not None:
+            print("Changing learning rate.")
             for param_group in optimizer.param_groups:
                 old_lr = param_group["lr"]
                 param_group["lr"] = old_lr * lr_factor

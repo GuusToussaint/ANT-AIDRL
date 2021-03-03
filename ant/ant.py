@@ -150,7 +150,7 @@ class ANT:
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
-                refinement=True,
+                lr_factor=0.1,
             )
 
         finally:
@@ -499,7 +499,6 @@ class SolverNode(TreeNode):
             val_losses = ops.eval(
                 self.ant.root, val_loader, multi_head_loss, device=device
             )
-            print()
         except Exception as e:
             print(f"error message: {e}")
         finally:
