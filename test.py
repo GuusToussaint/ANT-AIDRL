@@ -17,17 +17,26 @@ import random
 if __name__ == "__main__":
     random.seed(421)
 
-    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.5), (0.5))])
-
+    transform = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.5), (0.5)),
+        ]
+    )
 
     trainset = torchvision.datasets.MNIST(
-        root="./data", train=True, download=True, transform=transform,
-        target_transform=torchvision.transforms.ToTensor()
+        root="./data",
+        train=True,
+        download=True,
+        transform=transform,
+        target_transform=torchvision.transforms.ToTensor(),
     )
     testset = torchvision.datasets.MNIST(
-        root="./data", train=False, download=True, transform=transform,
-        target_transform=torchvision.transforms.ToTensor()
+        root="./data",
+        train=False,
+        download=True,
+        transform=transform,
+        target_transform=torchvision.transforms.ToTensor(),
     )
 
     # hold out 10% for the validation set
@@ -37,7 +46,11 @@ if __name__ == "__main__":
         in_shape=trainset[0][0].shape,
         num_classes=num_classes,
         new_router=functools.partial(
-            Conv2DGAPFCSigmoidRouter, convolutions=1, kernels=40, kernel_size=5, fc_layers=2
+            Conv2DGAPFCSigmoidRouter,
+            convolutions=1,
+            kernels=40,
+            kernel_size=5,
+            fc_layers=2,
         ),
         new_transformer=functools.partial(
             Conv2DRelu, convolutions=1, kernels=40, kernel_size=5, down_sample_freq=1
@@ -47,8 +60,6 @@ if __name__ == "__main__":
     )
 
     t.fit(trainset, transform=transform, max_expand_epochs=1, max_final_epochs=50)
-
-
 
     # TODO: change to tree.predict()
     testloader = torch.utils.data.DataLoader(
@@ -70,6 +81,5 @@ if __name__ == "__main__":
             # plt.show()
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-
 
     print("Accuracy of the network : %d %%" % (100 * correct / total))

@@ -19,17 +19,17 @@ from .ops import (
 
 class ANT:
     def __init__(
-            self,
-            in_shape,
-            num_classes,
-            new_router,
-            new_transformer,
-            new_solver,
-            new_optimizer,
-            soft_decision=True,
-            stochastic=False,
-            router_inherit=True,
-            transformer_inherit=False,
+        self,
+        in_shape,
+        num_classes,
+        new_router,
+        new_transformer,
+        new_solver,
+        new_optimizer,
+        soft_decision=True,
+        stochastic=False,
+        router_inherit=True,
+        transformer_inherit=False,
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
@@ -78,14 +78,14 @@ class ANT:
             self.loss_function = lambda pred, target: nll_loss(pred, target)
 
     def do_train(
-            self,
-            train_loader,
-            val_loader,
-            max_expand_epochs,
-            max_final_epochs,
-            *,
-            device="cpu",
-            verbose=True,
+        self,
+        train_loader,
+        val_loader,
+        max_expand_epochs,
+        max_final_epochs,
+        *,
+        device="cpu",
+        verbose=True,
     ):
         self.training = True
 
@@ -106,7 +106,7 @@ class ANT:
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
-                patience=5
+                patience=5,
             )
             # Expand while possible.
             while not self.root.fully_expanded():
@@ -134,8 +134,6 @@ class ANT:
                         )
                         break
 
-
-
             # Final refinement.
             if verbose:
                 print("Starting final refinement.")
@@ -150,7 +148,7 @@ class ANT:
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
-                refinement=True
+                refinement=True,
             )
 
         finally:
@@ -162,28 +160,28 @@ class ANT:
         def create_tree(dict, count):
             count += 1
             new_count = count
-            label = dict['kind']
+            label = dict["kind"]
             id = str(count)
 
             label += f' {dict["in_shape"]} '
-            if dict['kind'] == 'transformer':
+            if dict["kind"] == "transformer":
                 label += f'- {dict["transformer_count"]}'
 
             dot.node(id, label)
-            if dict['kind'] == 'router':
-                left, root_id, new_count = create_tree(dict['left_child'], new_count)
+            if dict["kind"] == "router":
+                left, root_id, new_count = create_tree(dict["left_child"], new_count)
                 dot.edge(id, str(root_id))
 
-                right, root_id, new_count = create_tree(dict['right_child'], new_count)
+                right, root_id, new_count = create_tree(dict["right_child"], new_count)
                 dot.edge(id, str(root_id))
-            elif dict['kind'] == 'transformer':
-                child, root_id, new_count = create_tree(dict['child'], new_count)
+            elif dict["kind"] == "transformer":
+                child, root_id, new_count = create_tree(dict["child"], new_count)
                 dot.edge(id, str(root_id))
 
             return dict, count, new_count
 
-        create_tree(self.state_dict()['tree'], 0)
-        dot.render('ANT-output/ANT-structure.gv', view=False)
+        create_tree(self.state_dict()["tree"], 0)
+        dot.render("ANT-output/ANT-structure.gv", view=False)
 
     def get_tree_composition(self):
         """ Returns (num_router, num_transformer, num_solver). """
@@ -196,14 +194,24 @@ class ANT:
         self.root = TreeNode.load_tree_state_dict(self, state_dict["tree"])
         self.root.load_state_dict(state_dict["params"])
 
-    def fit(self, dataset, batch_size=512, verbose=True, max_expand_epochs=100, max_final_epochs=200,
-            transform=None):
+    def fit(
+        self,
+        dataset,
+        batch_size=512,
+        verbose=True,
+        max_expand_epochs=100,
+        max_final_epochs=200,
+        transform=None,
+    ):
         # dataset = ops.SklearnDataset(X, y, X_transform=transform)
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         val_instances = int(len(dataset) * 0.1)
-        trainset, valset = random_split(dataset, [len(dataset) - val_instances, val_instances],
-                                        generator=torch.Generator())
+        trainset, valset = random_split(
+            dataset,
+            [len(dataset) - val_instances, val_instances],
+            generator=torch.Generator(),
+        )
         trainloader = torch.utils.data.DataLoader(
             trainset, batch_size=batch_size, shuffle=True, num_workers=0
         )
@@ -212,14 +220,16 @@ class ANT:
         )
 
         if verbose:
-            print(f'fitting model with {len(trainset)} training instances and {len(valset)} validation instances')
+            print(
+                f"fitting model with {len(trainset)} training instances and {len(valset)} validation instances"
+            )
 
         self.do_train(
             trainloader,
             valloader,
             max_expand_epochs=max_expand_epochs,
             max_final_epochs=max_final_epochs,
-            device=device
+            device=device,
         )
 
     def eval(self, dataset, batch_size=16):
@@ -240,7 +250,7 @@ class ANT:
                 correct += (predicted == labels).sum().item()
 
         print("Accuracy of the network : %f %%" % (100 * correct / total))
-        print(f'total {total}, correct {correct}, wrong {total-correct}')
+        print(f"total {total}, correct {correct}, wrong {total-correct}")
 
 
 class TreeNode(nn.Module):
@@ -363,7 +373,9 @@ class RouterNode(TreeNode):
 
 class TransformerNode(TreeNode):
     def __init__(self, ant, transformer, child, transformer_count):
-        super().__init__(ant, transformer.in_shape, transformer.out_shape, transformer_count)
+        super().__init__(
+            ant, transformer.in_shape, transformer.out_shape, transformer_count
+        )
         self.child = child
         self.unexpanded_depth = depth_inc(self.child.unexpanded_depth)
         self.transformer = transformer
@@ -443,7 +455,11 @@ class SolverNode(TreeNode):
 
         # Create transformer.
         t = self.ant.new_transformer(self.in_shape, self.transformer_count)
-        s = SolverNode(self.ant, self.ant.new_solver(t.out_shape, self.ant.num_classes), self.transformer_count+1)
+        s = SolverNode(
+            self.ant,
+            self.ant.new_solver(t.out_shape, self.ant.num_classes),
+            self.transformer_count + 1,
+        )
         transformer_candidate = TransformerNode(self.ant, t, s, self.transformer_count)
         if self.ant.transformer_inherit:
             s.solver.load_state_dict(leaf_candidate.state_dict())
@@ -451,10 +467,14 @@ class SolverNode(TreeNode):
         # Create router.
         r = self.ant.new_router(self.in_shape)
         s1 = SolverNode(
-            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes), self.transformer_count
+            self.ant,
+            self.ant.new_solver(r.out_shape, self.ant.num_classes),
+            self.transformer_count,
         )
         s2 = SolverNode(
-            self.ant, self.ant.new_solver(r.out_shape, self.ant.num_classes), self.transformer_count
+            self.ant,
+            self.ant.new_solver(r.out_shape, self.ant.num_classes),
+            self.transformer_count,
         )
         router_candidate = RouterNode(self.ant, r, s1, s2, self.transformer_count)
         if self.ant.router_inherit:
@@ -477,22 +497,23 @@ class SolverNode(TreeNode):
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
-                patience=5
+                patience=5,
             )
             val_losses = ops.eval(
                 self.ant.root, val_loader, multi_head_loss, device=device
             )
             print()
         except Exception as e:
-            print(f'error message: {e}')
+            print(f"error message: {e}")
         finally:
             # Restore self.
             self.solver = leaf_candidate
 
         # Use best node.
         best = val_losses.argmin().item()
-        if round(val_losses[val_losses.argmin().item()].item(), 5) == \
-                round(val_losses[val_losses.argmax().item()].item(), 5):
+        if round(val_losses[val_losses.argmin().item()].item(), 5) == round(
+            val_losses[val_losses.argmax().item()].item(), 5
+        ):
             # No 'real' difference, thus choosing lead as best
             best = 0
 

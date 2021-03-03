@@ -11,7 +11,14 @@ class SklearnDataset(Dataset):
     """
     Mapping between numpy (or sklearn) datasets to PyTorch datasets.
     """
-    def __init__(self, X: np.ndarray, y: np.ndarray, X_transform: Any = None, y_transform: Any = None):
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_transform: Any = None,
+        y_transform: Any = None,
+    ):
         """
         Args:
             X: Numpy ndarray
@@ -39,6 +46,7 @@ class SklearnDataset(Dataset):
             y = self.y_transform(y)
 
         return x, y
+
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
@@ -125,8 +133,14 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     if type(pad) is not tuple:
         pad = (pad, pad)
 
-    h = floor( ((h_w[0] + (2 * pad[0]) - ( dilation * (kernel_size[0] - 1) ) - 1 )/ stride[0]) + 1)
-    w = floor( ((h_w[1] + (2 * pad[1]) - ( dilation * (kernel_size[1] - 1) ) - 1 )/ stride[1]) + 1)
+    h = floor(
+        ((h_w[0] + (2 * pad[0]) - (dilation * (kernel_size[0] - 1)) - 1) / stride[0])
+        + 1
+    )
+    w = floor(
+        ((h_w[1] + (2 * pad[1]) - (dilation * (kernel_size[1] - 1)) - 1) / stride[1])
+        + 1
+    )
 
     assert h != 0 and w != 0
 
@@ -158,7 +172,7 @@ def train(
     patience=None,
     verbose=False,
     refinement=False,
-    lr_factor=0.1
+    lr_factor=0.1,
 ):
     if device:
         model.to(device)
@@ -215,11 +229,11 @@ def train(
             if no_improvement_epochs > patience:
                 break
 
-        if (epoch+1) % 50 == 0 and refinement:
+        if (epoch + 1) % 50 == 0 and refinement:
             print("changing learning rate")
             for param_group in optimizer.param_groups:
-                old_lr = param_group['lr']
-                param_group['lr'] = old_lr * lr_factor
+                old_lr = param_group["lr"]
+                param_group["lr"] = old_lr * lr_factor
 
         last_val_loss = val_loss
 
