@@ -350,14 +350,16 @@ class RouterNode(TreeNode):
             return p * self.left_child(x) + (1 - p) * self.right_child(x)
 
         if self.ant.stochastic:
-            random_value = random.random()
+            r = torch.rand(x.size())
         else:
-            random_value = 0.5
+            r = 0.5
 
-        if random_value < p:
-            return self.right_child(x)
-        else:
-            return self.left_child_child(x)
+        o = x.new_empty(x.size())
+        left_mask = p < r
+        right_mask = ~(p < r)
+        o[left_mask] = self.left_child(x[left_mask])
+        o[right_mask] = self.right_child(x[right_mask])
+        return o
 
     def set_frozen(self, frozen, recursive=False):
         for param in self.router.parameters():
