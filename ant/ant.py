@@ -86,6 +86,7 @@ class ANT:
         *,
         device="cpu",
         verbose=True,
+        output_graphviz=None,
     ):
         self.training = True
 
@@ -108,6 +109,7 @@ class ANT:
                 verbose=verbose,
                 patience=5,
             )
+
             # Expand while possible.
             while not self.root.fully_expanded():
                 try:
@@ -121,8 +123,8 @@ class ANT:
                         verbose=verbose,
                     )
 
-                    # Create the graphviz
-                    self.create_graphviz()
+                    if output_graphviz:
+                        self.create_graphviz(output_graphviz)
 
                 except RuntimeError as e:
                     if "out of memory" in str(e):
@@ -154,34 +156,30 @@ class ANT:
         finally:
             self.training = False
 
-    def create_graphviz(self):
+    def create_graphviz(self, fname):
         dot = Digraph(comment="Tree structure of trained ANT")
 
-        def create_tree(dict, count):
-            count += 1
-            new_count = count
-            label = dict["kind"]
-            id = str(count)
+        nodes = []
+        def create_tree(node):
+            node_id = str(len(nodes))
+            nodes.append(node)
 
-            label += f' {dict["in_shape"]} '
-            if dict["kind"] == "transformer":
-                label += f'- {dict["transformer_count"]}'
+            label = node["kind"]
+            label += f' {node["in_shape"]} '
+            if node["kind"] == "transformer":
+                label += f'- {node["transformer_count"]}'
+            dot.node(node_id, label)
 
-            dot.node(id, label)
-            if dict["kind"] == "router":
-                left, root_id, new_count = create_tree(dict["left_child"], new_count)
-                dot.edge(id, str(root_id))
+            if node["kind"] == "router":
+                dot.edge(node_id, create_tree(node["left_child"]))
+                dot.edge(node_id, create_tree(node["right_child"]))
+            elif node["kind"] == "transformer":
+                dot.edge(node_id, create_tree(node["child"]))
 
-                right, root_id, new_count = create_tree(dict["right_child"], new_count)
-                dot.edge(id, str(root_id))
-            elif dict["kind"] == "transformer":
-                child, root_id, new_count = create_tree(dict["child"], new_count)
-                dot.edge(id, str(root_id))
+            return node_id
 
-            return dict, count, new_count
-
-        create_tree(self.state_dict()["tree"], 0)
-        dot.render("ANT-output/ANT-structure.gv", view=False)
+        create_tree(self.state_dict()["tree"])
+        dot.render(fname, view=False)
 
     def get_tree_composition(self):
         """ Returns (num_router, num_transformer, num_solver). """
@@ -202,11 +200,10 @@ class ANT:
         max_expand_epochs=100,
         max_final_epochs=200,
         transform=None,
+        val_size=0.1,
     ):
-        # dataset = ops.SklearnDataset(X, y, X_transform=transform)
-
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        val_instances = int(len(dataset) * 0.1)
+        val_instances = int(len(dataset) * val_size)
         trainset, valset = random_split(
             dataset,
             [len(dataset) - val_instances, val_instances],
@@ -221,7 +218,7 @@ class ANT:
 
         if verbose:
             print(
-                f"fitting model with {len(trainset)} training instances and {len(valset)} validation instances"
+                f"Fitting model with {len(trainset)} training instances and {len(valset)} validation instances."
             )
 
         self.do_train(
