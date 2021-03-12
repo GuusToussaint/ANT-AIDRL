@@ -1,4 +1,5 @@
 env
+data
 tags
 *.pyo
 *.pyc

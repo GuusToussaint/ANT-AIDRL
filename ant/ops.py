@@ -119,14 +119,16 @@ def train(
     model,
     train_loader,
     loss_function,
-    new_optimizer,
+    optimizer,
     max_epochs,
     *,
+    batch_scheduler=None,
+    epoch_scheduler=None,
     device=None,
     val_loader=None,
     patience=None,
     verbose=False,
-    lr_factor=None,
+    scheduler=None,
 ):
     if device:
         model.to(device)
@@ -137,13 +139,13 @@ def train(
     last_val_loss = float("inf")
     no_improvement_epochs = 0
 
-    optimizer = new_optimizer(model.parameters())
     for epoch in range(max_epochs):
         model.train()
         epoch_loss = 0.0
         n = 0
 
         for i, data in enumerate(train_loader):
+            # One batch.
             inputs, labels = data
             if torch.isnan(torch.sum(inputs)) or torch.isinf(torch.sum(inputs)):
                 # FIXME: remove this.
@@ -161,14 +163,18 @@ def train(
                 loss = torch.sum(loss)
             loss.backward()
             optimizer.step()
-            n += len(data)
+            batch_scheduler()
+            n += labels.size(0)
 
         epoch_loss /= n
 
-        if val_loader and (verbose or patience is not None):
-            val_loss = eval(model, val_loader, loss_function, device=device)
+        if val_loader and (verbose or patience is not None or epoch_scheduler is not None):
+            val_loss = eval_mean(model, val_loader, loss_function, device=device)
         else:
             val_loss = None
+        
+        if epoch_scheduler is not None:
+            epoch_scheduler(val_loss)
 
         if verbose:
             out = "Epoch {}, train loss {}".format(epoch + 1, format_loss(epoch_loss))
@@ -184,16 +190,10 @@ def train(
             if no_improvement_epochs > patience:
                 break
 
-        if (epoch + 1) % 50 == 0 and lr_factor is not None:
-            print("Changing learning rate.")
-            for param_group in optimizer.param_groups:
-                old_lr = param_group["lr"]
-                param_group["lr"] = old_lr * lr_factor
-
         last_val_loss = val_loss
 
 
-def eval(model, data_loader, loss_function, *, device=None):
+def eval_mean(model, data_loader, loss_function, *, device=None):
     if device:
         model.to(device)
 
@@ -209,6 +209,6 @@ def eval(model, data_loader, loss_function, *, device=None):
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
             total += loss
-            n += len(data)
+            n += labels.size(0)
 
     return total / n
