@@ -27,8 +27,8 @@ class ANT:
         new_transformer,
         new_solver,
         new_optimizer,
-        new_batch_scheduler=None,
-        new_epoch_scheduler=None,
+        new_batch_scheduler=lambda opt: None,
+        new_epoch_scheduler=lambda opt: None,
         soft_decision=True,
         stochastic=False,
         router_inherit=True,
@@ -50,13 +50,11 @@ class ANT:
         new_optimizer must be a callable taking an iterable of params and
         returning a torch.optim.Optimizer object.
 
-        new_batch_scheduler if not None must be a callable taking an optimizer
-        returning a function that gets called without any arguments after
-        every batch.
+        new_batch_scheduler must be a callable taking an optimizer returning a
+        function that gets called without any arguments after every batch.
 
-        new_epoch_scheduler if not None must be a callable taking an optimizer
-        returning a function that gets called with the validation loss after
-        every epoch.
+        new_epoch_scheduler must be a callable taking an optimizer returning a
+        function that gets called with the validation loss after every epoch.
 
         soft_decision makes each router a soft decision node. If false the
         router either stochastically or greedily chooses the left or right
@@ -91,9 +89,9 @@ class ANT:
         self.training = False
 
         if num_classes == 1:
-            self.loss_function = nn.MSELoss()
+            self.loss_function = nn.MSELoss(reduction="sum")
         else:
-            self.loss_function = nn.NLLLoss()
+            self.loss_function = nn.NLLLoss(reduction="sum")
 
     def do_train(
         self,
@@ -102,6 +100,7 @@ class ANT:
         max_expand_epochs,
         max_final_epochs,
         *,
+        max_expansions=float('inf'),
         device="cpu",
         verbose=True,
         track_history=True,
@@ -132,7 +131,8 @@ class ANT:
             def hist_epoch_scheduler(val_loss):
                 hist["growth_val_losses"].append(val_loss)
                 hist["growth_endtimes"].append(time.time() - training_start)
-                epoch_scheduler(val_loss)
+                if epoch_scheduler is not None:
+                    epoch_scheduler(val_loss)
             ops.train(
                 self.root,
                 train_loader,
@@ -140,15 +140,19 @@ class ANT:
                 optimizer,
                 max_expand_epochs,
                 batch_scheduler=batch_scheduler,
-                epoch_scheduler=hist_epoch_scheduler if history else epoch_scheduler,
+                epoch_scheduler=hist_epoch_scheduler if track_history else epoch_scheduler,
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
-                patience=self.ant.growth_patience,
+                patience=self.growth_patience,
             )
 
+            if output_graphviz:
+                self.create_graphviz(output_graphviz)
+
             # Expand while possible.
-            while not self.root.fully_expanded():
+            num_expansions = 0
+            while not self.root.fully_expanded() and num_expansions < max_expansions:
                 try:
                     old = self.state_dict()
 
@@ -160,6 +164,7 @@ class ANT:
                         verbose=verbose,
                         hist=hist if track_history else None,
                     )
+                    num_expansions += 1
 
                     if output_graphviz:
                         self.create_graphviz(output_graphviz)
@@ -185,7 +190,8 @@ class ANT:
             def hist_epoch_scheduler(val_loss):
                 hist["refinement_val_losses"].append(val_loss)
                 hist["refinement_endtimes"].append(time.time() - training_start)
-                epoch_scheduler(val_loss)
+                if epoch_scheduler is not None:
+                    epoch_scheduler(val_loss)
             ops.train(
                 self.root,
                 train_loader,
@@ -249,13 +255,17 @@ class ANT:
         verbose=True,
         max_expand_epochs=100,
         max_final_epochs=200,
+        max_expansions=float('inf'),
+        device=None,
+        track_history=True,
+        output_graphviz=None,
     ):
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         trainloader = torch.utils.data.DataLoader(
             trainset, batch_size=batch_size, shuffle=True, num_workers=0
         )
         valloader = torch.utils.data.DataLoader(
-            valset, batch_size=batch_size, shuffle=True, num_workers=0
+            valset, batch_size=batch_size, shuffle=False, num_workers=0
         )
 
         if verbose:
@@ -268,46 +278,28 @@ class ANT:
             valloader,
             max_expand_epochs=max_expand_epochs,
             max_final_epochs=max_final_epochs,
+            max_expansions=max_expansions,
             device=device,
+            verbose=verbose,
+            track_history=track_history,
+            output_graphviz=output_graphviz,
         )
 
-    def eval_acc(self, dataset, batch_size=16):
-        testloader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=0
+    def eval_acc(self, dataset, batch_size=16, device=None):
+        device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        loader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        n = 0
-        correct = 0
-        with torch.no_grad():
-            self.root.eval()
-            self.root.to(device)
-            for data in testloader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = self.root(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                n += labels.size(0)
-                correct += (predicted == labels).sum().item()
+        loss_function = lambda outputs, labels: (
+            torch.max(outputs.data, 1).indices == labels).sum().item()
+        return ops.eval(self.root, loader, loss_function, device=device)
 
-        return correct / n
-
-    def eval_mean_loss(self, dataset, loss_function, batch_size=16):
-        testloader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=0
+    def eval_loss(self, dataset, loss_function, batch_size=16, device=None):
+        device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        loader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        total_loss = 0.0
-        n = 0
-        with torch.no_grad():
-            self.root.eval()
-            self.root.to(device)
-            for data in testloader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = self.root(inputs)
-                loss = loss_function(outputs, labels)
-                total_loss += loss
-                n += labels.size(0)
-
-        return total_loss / n
+        return ops.eval(self.root, loader, loss_function, device=device)
 
 
 class TreeNode(nn.Module):
@@ -455,7 +447,7 @@ class TransformerNode(TreeNode):
         assert tree_state_dict["kind"] == "transformer"
         return cls(
             ant,
-            ant.new_transformer(tree_state_dict["in_shape"]),
+            ant.new_transformer(tree_state_dict["in_shape"], tree_state_dict["transformer_count"]),
             TreeNode.load_tree_state_dict(ant, tree_state_dict["child"]),
             tree_state_dict["transformer_count"],
         )
@@ -516,7 +508,7 @@ class SolverNode(TreeNode):
     def expand(self, train_loader, val_loader, max_expand_epochs, *, device,
             verbose, hist):
         if verbose:
-            print("Attempting to expand leaf node.")
+            print("Attempting to expand leaf node...")
 
         # Mark leaf as expanded.
         self.unexpanded_depth = None
@@ -532,9 +524,9 @@ class SolverNode(TreeNode):
             self.ant.new_solver(t.out_shape, self.ant.num_classes),
             self.transformer_count + 1,
         )
-        transformer_candidate = TransformerNode(self.ant, t, s, self.transformer_count)
         if self.ant.transformer_inherit:
             s.solver.load_state_dict(leaf_candidate.state_dict())
+        transformer_candidate = TransformerNode(self.ant, t, s, self.transformer_count)
 
         # Create router.
         r = self.ant.new_router(self.in_shape)
@@ -548,10 +540,10 @@ class SolverNode(TreeNode):
             self.ant.new_solver(r.out_shape, self.ant.num_classes),
             self.transformer_count,
         )
-        router_candidate = RouterNode(self.ant, r, s1, s2, self.transformer_count)
         if self.ant.router_inherit:
             s1.solver.load_state_dict(leaf_candidate.state_dict())
             s2.solver.load_state_dict(leaf_candidate.state_dict())
+        router_candidate = RouterNode(self.ant, r, s1, s2, self.transformer_count)
 
         multi_head_loss = lambda outputs, labels: torch.stack(
             [self.ant.loss_function(output_head, labels) for output_head in outputs]
@@ -562,14 +554,15 @@ class SolverNode(TreeNode):
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
 
             # And train.
-            optimizer = self.new_optimizer(self.ant.root.parameters())
+            optimizer = self.ant.new_optimizer(self.ant.root.parameters())
             batch_scheduler = self.ant.new_batch_scheduler(optimizer)
             epoch_scheduler = self.ant.new_epoch_scheduler(optimizer)
             hist_val_losses = []
             def hist_epoch_scheduler(val_loss):
                 hist_val_losses.append(val_loss)
                 hist["growth_endtimes"].append(time.time() - hist["training_start"])
-                epoch_scheduler(val_loss)
+                if epoch_scheduler is not None:
+                    epoch_scheduler(val_loss)
             ops.train(
                 self.ant.root,
                 train_loader,
@@ -587,8 +580,6 @@ class SolverNode(TreeNode):
             val_losses = ops.eval(
                 self.ant.root, val_loader, multi_head_loss, device=device
             )
-        except Exception as e:
-            print(f"error message: {e}")
         finally:
             # Restore self always.
             self.solver = leaf_candidate
@@ -602,6 +593,9 @@ class SolverNode(TreeNode):
                     "/".join(f"{loss:.5}" for loss in val_losses.tolist()),
                 )
             )
+        if best != 0 and val_losses[best].item() > val_losses[0].item() * 0.99:
+            print("However, no meaningful improvement compared to leaf, pruning.")
+            best = 0
 
         hist["growth_val_losses"].extend(l.tolist()[best] for l in
             hist_val_losses)

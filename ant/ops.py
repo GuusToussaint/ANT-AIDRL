@@ -163,13 +163,14 @@ def train(
                 loss = torch.sum(loss)
             loss.backward()
             optimizer.step()
-            batch_scheduler()
+            if batch_scheduler is not None:
+                batch_scheduler()
             n += labels.size(0)
 
         epoch_loss /= n
 
         if val_loader and (verbose or patience is not None or epoch_scheduler is not None):
-            val_loss = eval_mean(model, val_loader, loss_function, device=device)
+            val_loss = eval(model, val_loader, loss_function, device=device)
         else:
             val_loss = None
         
@@ -193,7 +194,7 @@ def train(
         last_val_loss = val_loss
 
 
-def eval_mean(model, data_loader, loss_function, *, device=None):
+def eval(model, data_loader, loss_function, *, device=None):
     if device:
         model.to(device)
 

@@ -16,6 +16,7 @@ import random
 
 if __name__ == "__main__":
     random.seed(421)
+    np.random.seed(421)
 
     transform = torchvision.transforms.Compose(
         [
@@ -29,20 +30,22 @@ if __name__ == "__main__":
         train=True,
         download=True,
         transform=transform,
-        target_transform=torchvision.transforms.ToTensor(),
     )
     testset = torchvision.datasets.MNIST(
         root="./data",
         train=False,
         download=True,
         transform=transform,
-        target_transform=torchvision.transforms.ToTensor(),
     )
+
+    train_size = int(len(trainset) * 0.9)
+    trainset, valset = random_split(trainset, [train_size, len(trainset) - train_size])
 
     # hold out 10% for the validation set
     num_classes = 10
 
-    t = ANT(
+    tree_builder = functools.partial(
+        ANT,
         in_shape=trainset[0][0].shape,
         num_classes=num_classes,
         new_router=functools.partial(
@@ -56,30 +59,16 @@ if __name__ == "__main__":
             Conv2DRelu, convolutions=1, kernels=40, kernel_size=5, down_sample_freq=1
         ),
         new_solver=LinearClassifier,
-        new_optimizer=lambda in_shape: torch.optim.Adam(in_shape),
+        new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
     )
 
-    t.fit(trainset, transform=transform, max_expand_epochs=1, max_final_epochs=50)
+    t = tree_builder()
+    hist = t.fit(trainset, valset, max_expand_epochs=100, max_final_epochs=50, output_graphviz="live_tree.gv")
+    print("Accuracy of the network: {:%}".format(t.eval_acc(testset)))
 
-    # TODO: change to tree.predict()
-    testloader = torch.utils.data.DataLoader(
-        testset, batch_size=16, shuffle=False, num_workers=1
-    )
+    print(hist)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    total = 0
-    correct = 0
-    with torch.no_grad():
-        t.root.eval()
-        t.root.to(device)
-        for data in testloader:
-            inputs, labels = data[0].to(device), data[1].to(device)
-            outputs = t.root(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            # plt.imshow(inputs[0].cpu().reshape(28, 28, 1))
-            # plt.title(f"true:{labels[0].cpu()}\tpredicted:{predicted[0].cpu()}")
-            # plt.show()
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+    t2 = tree_builder()
+    t2.load_state_dict(t.state_dict())
+    print("Accuracy of the network loaded from weights: {:%}".format(t2.eval_acc(testset)))
 
-    print("Accuracy of the network : %d %%" % (100 * correct / total))
