@@ -36,11 +36,10 @@ class LinearClassifier(Solver):
 class LinearRegressor(Solver):
     def __init__(self, in_shape, num_classes):
         super().__init__(in_shape, num_classes)
-        assert self.num_classes == 1
         nodes = np.prod(in_shape)
 
         modules = [nn.Flatten(), nn.Linear(nodes, num_classes)]
-        self.model(nn.Sequential(*modules))
+        self.model = nn.Sequential(*modules)
 
     def forward(self, x):
         return self.model(x)

@@ -34,12 +34,13 @@ class ANT:
         router_inherit=True,
         transformer_inherit=False,
         growth_patience=5,
+        regression=False
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
         in_shape gives the input shape (excluding first batch dimension).
 
-        num_classes the number of classes (where 1 is regression).
+        num_classes the number of classes
 
         new_router/new_transformer must be callables taking an input shape
         and returning a Router/Transformer object.
@@ -66,6 +67,9 @@ class ANT:
 
         growth_patience determines the max number of iterations without progress
         during growth phase training.
+
+        regression is set to True when a regression task is required, else
+        it is set to False
         """
 
         self.in_shape = in_shape
@@ -88,7 +92,7 @@ class ANT:
 
         self.training = False
 
-        if num_classes == 1:
+        if regression:
             self.loss_function = nn.MSELoss(reduction="sum")
         else:
             self.loss_function = nn.NLLLoss(reduction="sum")

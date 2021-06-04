@@ -3,3 +3,6 @@ data
 tags
 *.pyo
 *.pyc
+*.gv
+*.gv.pdf
+.vscode/settings.json

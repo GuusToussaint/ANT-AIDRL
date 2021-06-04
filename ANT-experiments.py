@@ -14,6 +14,7 @@ from torch.utils.data import random_split
 import pickle
 from sklearn.datasets import fetch_openml
 import numpy as np
+from loadSARCOS import SARCOSDataset
 
 ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-B",
              "ANT-CIFAR10-A", "ANT-CIFAR10-B", "ANT-CIFAR10-C",
@@ -85,10 +86,24 @@ def setup_data(dataset):
         trainset, valset = random_split(trainset, [train_size, len(trainset) - train_size])
         return trainset, testset, valset, num_classes, max_final_epochs
     elif dataset == "SARCOS":
-        num_classes = 1
+        num_classes = 7
         max_final_epochs = 300
 
         # Loading the SARCOS dataset from .mat file (since no dataloader is present for this dataset)
+        trainset = SARCOSDataset(
+            root='./data', 
+            train=True
+        )
+
+        testset = SARCOSDataset(
+            root='./data',
+            train=False
+        )
+
+        train_size = int(len(trainset) * 0.9)
+        trainset, valset = random_split(trainset, [train_size, len(trainset) - train_size])
+
+        return trainset, testset, valset, num_classes, max_final_epochs
 
 
 class Presets():
@@ -273,6 +288,7 @@ class Presets():
                 ),
                 new_solver=LinearRegressor,
                 new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+                regression=True
             )()
         raise RuntimeError('The defined preset is not available ')
 

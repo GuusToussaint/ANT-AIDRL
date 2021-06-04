@@ -26,10 +26,11 @@ class FullyConnectedTransformer(Transformer):
             in_shape,
             in_shape,
         )
-        # assert len(in_shape) == 1
+
+        assert len(in_shape) == 1
 
         self.model = nn.Sequential(
-            nn.Linear(in_shape[0], in_shape[1] // fc_reduction),
+            nn.Linear(in_shape[0], in_shape[0]),
             nn.Tanh(),
         )
 
