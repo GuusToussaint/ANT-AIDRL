@@ -6,15 +6,18 @@ from ant.transformers import (
     FullyConnectedTransformer,
     Conv2DRelu,
 )
-from ant.solvers import LinearClassifier
+from ant.solvers import LinearClassifier, LinearRegressor
 import functools
 import torchvision
 import torch
 from torch.utils.data import random_split
 import pickle
+from sklearn.datasets import fetch_openml
 import numpy as np
 
-ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-B"]
+ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-B",
+             "ANT-CIFAR10-A", "ANT-CIFAR10-B", "ANT-CIFAR10-C",
+             "ANT-SARCOS"]
 
 
 def setup_data(dataset):
@@ -49,6 +52,44 @@ def setup_data(dataset):
         train_size = int(len(trainset) * 0.9)
         trainset, valset = random_split(trainset, [train_size, len(trainset) - train_size])
         return trainset, testset, valset, num_classes, max_final_epochs
+    elif dataset == "CIFAR10":
+        num_classes = 10
+        max_final_epochs = 200
+
+        # Not really sure that this is how they do it in the original work
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+            ]
+        )
+
+        trainset = torchvision.datasets.CIFAR10(
+            root="./data",
+            train=True,
+            download=True,
+            transform=transform,
+        )
+
+        testset = torchvision.datasets.CIFAR10(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transform,
+        )
+
+        sample_size = len(trainset)
+        # sample_size = 500
+        trainset, _ = random_split(trainset, [sample_size, len(trainset) - sample_size])
+
+        train_size = int(len(trainset) * 0.9)
+        trainset, valset = random_split(trainset, [train_size, len(trainset) - train_size])
+        return trainset, testset, valset, num_classes, max_final_epochs
+    elif dataset == "SARCOS":
+        num_classes = 1
+        max_final_epochs = 300
+
+        # Loading the SARCOS dataset from .mat file (since no dataloader is present for this dataset)
+
 
 class Presets():
     def __init__(self, ant_type):
@@ -77,7 +118,9 @@ class Presets():
 
     def save_tree(self):
         state_dict = self.tree.state_dict()
-        pickle.dump(state_dict, open(f"{self.type}.p", "wb"))
+        if self.hist is not None:
+            pickle.dump(self.hist, open(f"{self.type}-hist.p", "wb"))
+        pickle.dump(state_dict, open(f"{self.type}-state-dict.p", "wb"))
 
     def load_tree(self, fname):
         state_dict = pickle.load(open(f"{self.type}.p", "rb"))
@@ -125,7 +168,7 @@ class Presets():
                         ),
                         new_solver=LinearClassifier,
                         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
-                    )
+                    )()
         elif self.type == "ANT-MNIST-C":
             # Router:           1 × conv5-5 + GAP + 2×FC +Sigmoid
             # Transformer:      1 × conv5-5+ReLU
@@ -146,8 +189,91 @@ class Presets():
                         ),
                         new_solver=LinearClassifier,
                         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
-                    )
-
+                    )()
+        elif self.type == "ANT-CIFAR10-A":
+            # Router:           2 × conv3-128 + GAP + 1×FC + Sigmoid
+            # Transformer:      2 × conv3-128 + ReLU
+            # Solver:           GAP + LC
+            # Downsample Freq:  1
+            return functools.partial(
+                        ANT,
+                        in_shape=self.trainset[0][0].shape,
+                        num_classes=self.num_classes,
+                        new_router=functools.partial(
+                            Conv2DGAPFCSigmoidRouter,
+                            convolutions=2,
+                            kernels=128,
+                            kernel_size=3,
+                            fc_layers=1,
+                        ),
+                        new_transformer=functools.partial(
+                            Conv2DRelu, convolutions=2, kernels=128, kernel_size=3, down_sample_freq=1
+                        ),
+                        new_solver=functools.partial(LinearClassifier, GAP=True),
+                        new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+                    )()
+        elif self.type == "ANT-CIFAR10-B":
+            # Router:           2 × conv3-96 + GAP + 1×FC + Sigmoid
+            # Transformer:      2 × conv3-96 + ReLU
+            # Solver:           LC
+            # Downsample Freq:  1
+            return functools.partial(
+                        ANT,
+                        in_shape=self.trainset[0][0].shape,
+                        num_classes=self.num_classes,
+                        new_router=functools.partial(
+                            Conv2DGAPFCSigmoidRouter,
+                            convolutions=2,
+                            kernels=96,
+                            kernel_size=3,
+                            fc_layers=1,
+                        ),
+                        new_transformer=functools.partial(
+                            Conv2DRelu, convolutions=2, kernels=96, kernel_size=3, down_sample_freq=1
+                        ),
+                        new_solver=functools.partial(LinearClassifier, GAP=False),
+                        new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+                    )()
+        elif self.type == "ANT-CIFAR10-C":
+            # Router:           2 × conv3-48 + GAP + 1×FC + Sigmoid
+            # Transformer:      2 × conv3-96 + ReLU
+            # Solver:           GAP + LC
+            # Downsample Freq:  1
+            return functools.partial(
+                        ANT,
+                        in_shape=self.trainset[0][0].shape,
+                        num_classes=self.num_classes,
+                        new_router=functools.partial(
+                            Conv2DGAPFCSigmoidRouter,
+                            convolutions=2,
+                            kernels=48,
+                            kernel_size=3,
+                            fc_layers=1,
+                        ),
+                        new_transformer=functools.partial(
+                            Conv2DRelu, convolutions=2, kernels=96, kernel_size=3, down_sample_freq=1
+                        ),
+                        new_solver=functools.partial(LinearClassifier, GAP=True),
+                        new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+                    )()
+        elif self.type == "ANT-SARCOS":
+            # Router:           1 × FC + Sigmoid
+            # Transformer:      1 x FC + tahn
+            # Solver:           LR
+            # Downsample Freq:  0
+            return functools.partial(
+                ANT,
+                in_shape=self.trainset[0][0].shape,
+                num_classes=self.num_classes,
+                new_router=functools.partial(
+                    FullyConnectedSigmoidRouter,
+                ),
+                new_transformer=functools.partial(
+                    FullyConnectedTransformer,
+                ),
+                new_solver=LinearRegressor,
+                new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+            )()
         raise RuntimeError('The defined preset is not available ')
 
 
