@@ -1,6 +1,9 @@
+from numpy.core.fromnumeric import shape
 import torch
+from torch._C import dtype
 import torch.nn as nn
 from graphviz import Digraph
+from torch.nn.modules.loss import MSELoss
 from torch.utils.data import TensorDataset, DataLoader, random_split
 from torch import Tensor
 import gc
@@ -91,8 +94,9 @@ class ANT:
         self.growth_patience = growth_patience
 
         self.training = False
+        self.regression = regression
 
-        if regression:
+        if self.regression:
             self.loss_function = nn.MSELoss(reduction="sum")
         else:
             self.loss_function = nn.NLLLoss(reduction="sum")
@@ -294,8 +298,12 @@ class ANT:
         loader = torch.utils.data.DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
-        loss_function = lambda outputs, labels: (
-            torch.max(outputs.data, 1).indices == labels).sum().item()
+
+        if self.regression:
+            loss_function = MSELoss(reduction="sum")
+        else:
+            loss_function = lambda outputs, labels: (
+                torch.max(outputs.data, 1).indices == labels).sum().item()
         return ops.eval(self.root, loader, loss_function, device=device)
 
     def eval_loss(self, dataset, loss_function, batch_size=16, device=None):
@@ -404,19 +412,26 @@ class RouterNode(TreeNode):
 
     def forward(self, x):
         p = self.router(x)
+
+        # print(p.size(), x.size(), self.left_child(x).size())
+
         if self.ant.soft_decision or self.ant.training:
             return p * self.left_child(x) + (1 - p) * self.right_child(x)
 
         if self.ant.stochastic:
-            r = torch.rand(x.size())
+            r = torch.rand(p.size())
         else:
             r = 0.5
 
-        o = x.new_empty(x.size())
-        left_mask = p < r
-        right_mask = ~(p < r)
-        o[left_mask] = self.left_child(x[left_mask])
-        o[right_mask] = self.right_child(x[right_mask])
+        
+        left_mask = (p > r).squeeze()
+        right_mask = (~(p > r)).squeeze()
+        l = self.left_child(x[left_mask])
+        r = self.right_child(x[right_mask])
+
+        o = l.new_empty(p.size()[:1] + l.size()[1:])
+        if l.size()[0]: o[left_mask] = l
+        if r.size()[0]: o[right_mask] = r
         return o
 
     def set_frozen(self, frozen, recursive=False):

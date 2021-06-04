@@ -209,6 +209,9 @@ def eval(model, data_loader, loss_function, *, device=None):
                 inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
+
+            # print(outputs.shape)
+            # print(labels.shape)
             loss = loss_function(outputs, labels)
             total += loss
             n += labels.size(0)

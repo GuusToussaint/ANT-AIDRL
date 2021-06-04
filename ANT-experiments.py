@@ -16,7 +16,10 @@ from sklearn.datasets import fetch_openml
 import numpy as np
 from loadSARCOS import SARCOSDataset
 
-ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-B",
+# ROOT_FOLDER = '/data/s1805819/ANT/data'
+ROOT_FOLDER = './data'
+
+ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-C",
              "ANT-CIFAR10-A", "ANT-CIFAR10-B", "ANT-CIFAR10-C",
              "ANT-SARCOS"]
 
@@ -34,20 +37,20 @@ def setup_data(dataset):
         )
 
         trainset = torchvision.datasets.MNIST(
-            root="./data",
+            root=ROOT_FOLDER,
             train=True,
             download=True,
             transform=transform,
         )
         testset = torchvision.datasets.MNIST(
-            root="./data",
+            root=ROOT_FOLDER,
             train=False,
             download=True,
             transform=transform,
         )
         
         sample_size = len(trainset)
-        # sample_size = 500
+        sample_size = 500
         trainset, _ = random_split(trainset, [sample_size, len(trainset) - sample_size])
 
         train_size = int(len(trainset) * 0.9)
@@ -65,14 +68,14 @@ def setup_data(dataset):
         )
 
         trainset = torchvision.datasets.CIFAR10(
-            root="./data",
+            root=ROOT_FOLDER,
             train=True,
             download=True,
             transform=transform,
         )
 
         testset = torchvision.datasets.CIFAR10(
-            root="./data",
+            root=ROOT_FOLDER,
             train=False,
             download=True,
             transform=transform,
@@ -91,12 +94,12 @@ def setup_data(dataset):
 
         # Loading the SARCOS dataset from .mat file (since no dataloader is present for this dataset)
         trainset = SARCOSDataset(
-            root='./data', 
+            root=ROOT_FOLDER, 
             train=True
         )
 
         testset = SARCOSDataset(
-            root='./data',
+            root=ROOT_FOLDER,
             train=False
         )
 
@@ -138,7 +141,7 @@ class Presets():
         pickle.dump(state_dict, open(f"{self.type}-state-dict.p", "wb"))
 
     def load_tree(self, fname):
-        state_dict = pickle.load(open(f"{self.type}.p", "rb"))
+        state_dict = pickle.load(open(f"{self.type}-state-dict.p", "rb"))
         self.tree.load_state_dict(state_dict)
 
     def get_tree(self):
@@ -312,8 +315,8 @@ if __name__ == '__main__':
     ant_type = get_ant_type()
 
     ANT = Presets(ant_type)
-    ANT.start_training()
-    # ANT.load_tree(f"{ant_type}.p")
+    # ANT.start_training()
+    ANT.load_tree(ant_type)
     
     ANT.save_tree()
     single_acc, multi_acc = ANT.get_accuracy()
