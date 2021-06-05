@@ -5,4 +5,5 @@ tags
 *.pyc
 *.gv
 *.gv.pdf
+*.p
 .vscode/settings.json
