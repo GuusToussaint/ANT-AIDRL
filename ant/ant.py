@@ -413,8 +413,6 @@ class RouterNode(TreeNode):
     def forward(self, x):
         p = self.router(x)
 
-        # print(p.size(), x.size(), self.left_child(x).size())
-
         if self.ant.soft_decision or self.ant.training:
             return p * self.left_child(x) + (1 - p) * self.right_child(x)
 
