@@ -14,8 +14,8 @@ import pickle
 from loadSARCOS import SARCOSDataset
 import os
 
-# ROOT_FOLDER = '/data/s1805819/ANT/data'
-ROOT_FOLDER = './data'
+ROOT_FOLDER = '/data/s1805819/ANT/data'
+# ROOT_FOLDER = './data'
 
 def setup_data(dataset):
     if dataset == "MNIST":
@@ -25,7 +25,7 @@ def setup_data(dataset):
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5), (0.5)),
+                torchvision.transforms.Normalize((0.1307,), (0.3081,))
             ]
         )
 
@@ -43,7 +43,7 @@ def setup_data(dataset):
         )
         
         sample_size = len(trainset)
-        sample_size = 500
+        # sample_size = 500
         trainset, _ = random_split(trainset, [sample_size, len(trainset) - sample_size])
 
         train_size = int(len(trainset) * 0.9)
@@ -59,6 +59,7 @@ def setup_data(dataset):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]
         )
 
@@ -76,8 +77,8 @@ def setup_data(dataset):
             transform=transform,
         )
 
-        # sample_size = len(trainset)
-        sample_size = 500
+        sample_size = len(trainset)
+        # sample_size = 500
         trainset, _ = random_split(trainset, [sample_size, len(trainset) - sample_size])
 
         train_size = int(len(trainset) * 0.9)
@@ -225,7 +226,6 @@ class Presets():
                         ),
                         new_solver=functools.partial(LinearClassifier, GAP=True),
                         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
-                        use_router=False # TODO: remove, 
                     )()
         elif self.type == "ANT-CIFAR10-B":
             # Router:           2 × conv3-96 + GAP + 1×FC + Sigmoid

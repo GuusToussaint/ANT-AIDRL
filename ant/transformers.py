@@ -54,47 +54,35 @@ class Conv2DRelu(Transformer):
         if (prev_transformers + 1) % down_sample_freq == 0:
             downsample = True
 
-        _old_kernel_size = kernel_size
-        kernel_size = min((kernel_size,) + in_shape[-2:])
-        if _old_kernel_size != kernel_size:
-            downsample = False
-
-        current_shape = tuple(in_shape[-2:])
-        for _ in range(convolutions):
-            current_shape = ops.conv_output_shape(
-                current_shape, kernel_size=kernel_size
-            )
-        if downsample:
-            current_shape = (
-                floor(((i + 2 * 0 - 1 * (2 - 1)) / 2) + 1) for i in current_shape
-            )
-        out_shape = (kernels, *current_shape)
-
-        super().__init__(in_shape, out_shape)
-
-        print("old shape", in_shape)
-        print("new shape", out_shape)
 
         # Convolutional layers.
-        shape = in_shape
+        current_shape = in_shape
         modules = []
-        for i in range(convolutions):
-            conv = nn.Conv2d(
-                in_channels=shape[0],
-                out_channels=kernels,
-                kernel_size=kernel_size,
+        for _ in range(convolutions):            
+            new_shape = ops.conv_output_shape(
+                tuple(current_shape[-2:]), kernel_size=kernel_size
             )
-            modules.append(conv)
-            shape = (kernels,) + ops.conv_output_shape(tuple(shape[-2:]), kernel_size)
-            modules.append(nn.ReLU())
+            if new_shape [0] >= kernel_size or new_shape[1] >= kernel_size:
+
+                conv = nn.Conv2d(
+                    in_channels=current_shape[0],
+                    out_channels=kernels,
+                    kernel_size=kernel_size,
+                )
+                modules.append(conv)
+                modules.append(nn.ReLU())
+                current_shape = (kernels,) + new_shape
+            else: 
+                print("skipping this convolution due to the size")
+                break
+
         if downsample:
-            modules.append(nn.MaxPool2d(kernel_size=(2, 2)))
+            if current_shape[0] >= 2 and current_shape[1] >= 2:
+                modules.append(nn.MaxPool2d(kernel_size=(2, 2)))
+            else:
+                print("skipping max pooling due to the size")
+        super().__init__(in_shape, current_shape)
         self.model = nn.Sequential(*modules)
 
     def forward(self, x):
-        print("Starting transformer forward pass")
-        print(x.size())
-        print(self.model)
-        self.model(x)
-        print("isn't reached")
         return self.model(x)

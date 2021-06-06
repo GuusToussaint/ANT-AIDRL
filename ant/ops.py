@@ -98,7 +98,6 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
         + 1
     )
 
-    assert h != 0 and w != 0
 
     return h, w
 
@@ -161,10 +160,8 @@ def train(
             if device:
                 inputs, labels = inputs.to(device), labels.to(device)
 
-            print(1)
             optimizer.zero_grad()
             outputs = model(inputs)
-            print(2)
             loss = loss_function(outputs, labels)
             epoch_loss += loss
             if len(loss.shape) == 1:

@@ -32,28 +32,35 @@ class Conv2DGAPFCSigmoidRouter(Router):
     ):
         super().__init__(in_shape)
 
-        kernel_size = min((kernel_size,) + in_shape[-2:])
         # Convolutional layers.
-        shape = in_shape
+        current_shape = in_shape
         modules = []
         for i in range(convolutions):
-            conv = nn.Conv2d(
-                in_channels=shape[0],
-                out_channels=kernels,
-                kernel_size=kernel_size,
-            )
-            modules.append(conv)
 
-            shape = (kernels,) + ops.conv_output_shape(tuple(shape[-2:]), kernel_size)
-            if i != convolutions - 1 or fc_layers > 0:
+            new_shape = ops.conv_output_shape(
+                tuple(current_shape[-2:]), kernel_size=kernel_size
+            )
+
+            if new_shape [0] >= kernel_size or new_shape[1] >= kernel_size:
+                conv = nn.Conv2d(
+                    in_channels=current_shape[0],
+                    out_channels=kernels,
+                    kernel_size=kernel_size,
+                )
+                modules.append(conv)
                 modules.append(nn.ReLU())
+
+                current_shape = (kernels,) + new_shape
+            else: 
+                print("skipping this convolution due to the size")
+                break
 
         # Global average pooling.
         modules.append(nn.AdaptiveAvgPool2d(1))
         modules.append(nn.Flatten())
 
         # Fully connected layers.
-        neurons = shape[0]
+        neurons = current_shape[0]
         for i in range(fc_layers):
             if i != fc_layers - 1:
                 modules.append(nn.Linear(neurons, 1 + neurons // fc_reduction))

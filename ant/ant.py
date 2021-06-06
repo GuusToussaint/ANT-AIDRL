@@ -192,6 +192,8 @@ class ANT:
                             "Recovered from out-of-memory error, stopping expansion process."
                         )
                         break
+                    else:
+                        raise
 
             # Final refinement.
             if verbose:
