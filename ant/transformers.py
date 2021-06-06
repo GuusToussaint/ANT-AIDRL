@@ -55,11 +55,11 @@ class Conv2DRelu(Transformer):
             downsample = True
 
         _old_kernel_size = kernel_size
-        kernel_size = min((kernel_size,) + in_shape[1:3])
+        kernel_size = min((kernel_size,) + in_shape[-2:])
         if _old_kernel_size != kernel_size:
             downsample = False
 
-        current_shape = tuple(in_shape[1:3])
+        current_shape = tuple(in_shape[-2:])
         for _ in range(convolutions):
             current_shape = ops.conv_output_shape(
                 current_shape, kernel_size=kernel_size
@@ -72,6 +72,9 @@ class Conv2DRelu(Transformer):
 
         super().__init__(in_shape, out_shape)
 
+        print("old shape", in_shape)
+        print("new shape", out_shape)
+
         # Convolutional layers.
         shape = in_shape
         modules = []
@@ -82,11 +85,16 @@ class Conv2DRelu(Transformer):
                 kernel_size=kernel_size,
             )
             modules.append(conv)
-            shape = (kernels,) + ops.conv_output_shape(tuple(shape[1:3]), kernel_size)
+            shape = (kernels,) + ops.conv_output_shape(tuple(shape[-2:]), kernel_size)
             modules.append(nn.ReLU())
         if downsample:
             modules.append(nn.MaxPool2d(kernel_size=(2, 2)))
         self.model = nn.Sequential(*modules)
 
     def forward(self, x):
+        print("Starting transformer forward pass")
+        print(x.size())
+        print(self.model)
+        self.model(x)
+        print("isn't reached")
         return self.model(x)

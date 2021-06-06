@@ -56,6 +56,8 @@ def setup_data(dataset):
         # Not really sure that this is how they do it in the original work
         transform = torchvision.transforms.Compose(
             [
+                torchvision.transforms.RandomCrop(32, padding=4),
+                torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
             ]
         )
@@ -74,8 +76,8 @@ def setup_data(dataset):
             transform=transform,
         )
 
-        sample_size = len(trainset)
-        # sample_size = 500
+        # sample_size = len(trainset)
+        sample_size = 500
         trainset, _ = random_split(trainset, [sample_size, len(trainset) - sample_size])
 
         train_size = int(len(trainset) * 0.9)
@@ -223,6 +225,7 @@ class Presets():
                         ),
                         new_solver=functools.partial(LinearClassifier, GAP=True),
                         new_optimizer=lambda in_shape: torch.optim.Adam(in_shape, lr=1e-3, betas=(0.9, 0.999)),
+                        use_router=False # TODO: remove, 
                     )()
         elif self.type == "ANT-CIFAR10-B":
             # Router:           2 × conv3-96 + GAP + 1×FC + Sigmoid

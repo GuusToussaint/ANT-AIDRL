@@ -37,7 +37,8 @@ class ANT:
         router_inherit=True,
         transformer_inherit=False,
         growth_patience=5,
-        regression=False
+        regression=False,
+        use_router=True
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
@@ -73,6 +74,10 @@ class ANT:
 
         regression is set to True when a regression task is required, else
         it is set to False
+
+        use_router is set to True when the building of a tree should include 
+        routers, else (when we want to mimic a CNN) it is set to False and 
+        no routers are placed in the tree building process
         """
 
         self.in_shape = in_shape
@@ -95,6 +100,7 @@ class ANT:
 
         self.training = False
         self.regression = regression
+        self.use_router = use_router
 
         if self.regression:
             self.loss_function = nn.MSELoss(reduction="sum")
@@ -567,6 +573,8 @@ class SolverNode(TreeNode):
         )
 
         try:
+            if verbose:
+                print("done creating the new modules")
             # Monkey-patch this nodes' solver.
             self.solver = Stack(leaf_candidate, transformer_candidate, router_candidate)
 
@@ -613,6 +621,9 @@ class SolverNode(TreeNode):
         if best != 0 and val_losses[best].item() > val_losses[0].item() * 0.99:
             print("However, no meaningful improvement compared to leaf, pruning.")
             best = 0
+
+        if not self.ant.use_router and best == 2:
+            best = val_losses[:-1].argmin().item() # select the best (non-router) module
 
         hist["growth_val_losses"].extend(l.tolist()[best] for l in
             hist_val_losses)

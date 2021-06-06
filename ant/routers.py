@@ -32,7 +32,7 @@ class Conv2DGAPFCSigmoidRouter(Router):
     ):
         super().__init__(in_shape)
 
-        kernel_size = min((kernel_size,) + in_shape[1:3])
+        kernel_size = min((kernel_size,) + in_shape[-2:])
         # Convolutional layers.
         shape = in_shape
         modules = []
@@ -44,7 +44,7 @@ class Conv2DGAPFCSigmoidRouter(Router):
             )
             modules.append(conv)
 
-            shape = (kernels,) + ops.conv_output_shape(tuple(shape[1:3]), kernel_size)
+            shape = (kernels,) + ops.conv_output_shape(tuple(shape[-2:]), kernel_size)
             if i != convolutions - 1 or fc_layers > 0:
                 modules.append(nn.ReLU())
 

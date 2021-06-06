@@ -2,7 +2,7 @@ from typing import Any
 import torch
 from torch._C import dtype
 import torch.nn as nn
-
+import numpy as np
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
@@ -131,6 +131,11 @@ def train(
     verbose=False,
     scheduler=None,
 ):
+    if verbose:
+        model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        print(f"started training loop for model with {params} trainable parameters")
+
     if device:
         model.to(device)
 
@@ -156,8 +161,10 @@ def train(
             if device:
                 inputs, labels = inputs.to(device), labels.to(device)
 
+            print(1)
             optimizer.zero_grad()
             outputs = model(inputs)
+            print(2)
             loss = loss_function(outputs, labels)
             epoch_loss += loss
             if len(loss.shape) == 1:
