@@ -7,3 +7,4 @@ tags
 *.gv.pdf
 *.p
 .vscode/settings.json
+.vscode/launch.json

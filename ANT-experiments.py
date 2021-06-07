@@ -2,9 +2,15 @@ import sys
 from Presets import Presets
 
 
-ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-C",
-             "ANT-CIFAR10-A", "ANT-CIFAR10-B", "ANT-CIFAR10-C",
-             "ANT-SARCOS"]
+ANT_types = [
+    "ANT-MNIST-A", "ANT-MNIST-A-CNN", "ANT-MNIST-A-HME",
+    "ANT-MNIST-B", "ANT-MNIST-B-CNN", "ANT-MNIST-B-HME", 
+    "ANT-MNIST-C", "ANT-MNIST-C-CNN", "ANT-MNIST-C-HME",
+    "ANT-CIFAR10-A", "ANT-CIFAR10-A-CNN", "ANT-CIFAR10-A-HME",
+    "ANT-CIFAR10-B", "ANT-CIFAR10-B-CNN", "ANT-CIFAR10-B-HME",
+    "ANT-CIFAR10-B", "ANT-CIFAR10-B-CNN", "ANT-CIFAR10-B-HME",
+    "ANT-SARCOS", "ANT-SARCOS-CNN", "ANT-SARCOS-HME"
+    ]
 
 
 def get_ant_type():
