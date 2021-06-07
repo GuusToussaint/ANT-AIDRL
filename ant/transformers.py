@@ -13,7 +13,7 @@ class Transformer(nn.Module):
 
 
 class IdentityTransformer(Transformer):
-    def __init__(self, in_shape):
+    def __init__(self, in_shape, *args):
         super().__init__(in_shape, in_shape)
 
     def forward(self, x):
@@ -77,8 +77,13 @@ class Conv2DRelu(Transformer):
                 break
 
         if downsample:
-            if current_shape[0] >= 2 and current_shape[1] >= 2:
+            new_shape = ops.conv_output_shape(
+                tuple(current_shape[-2:]), kernel_size=(2,2), pad=0, stride=2
+            )
+            if new_shape[-2] >= 2 and new_shape[-1] >= 2:
                 modules.append(nn.MaxPool2d(kernel_size=(2, 2)))
+                current_shape = (kernels,) + new_shape
+
             else:
                 print("skipping max pooling due to the size")
         super().__init__(in_shape, current_shape)

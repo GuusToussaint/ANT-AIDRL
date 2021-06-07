@@ -38,7 +38,8 @@ class ANT:
         transformer_inherit=False,
         growth_patience=5,
         regression=False,
-        use_router=True
+        use_router=True,
+        max_depth=10
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
 
@@ -78,6 +79,8 @@ class ANT:
         use_router is set to True when the building of a tree should include 
         routers, else (when we want to mimic a CNN) it is set to False and 
         no routers are placed in the tree building process
+
+        max_depth is the maximal depth a tree should reach
         """
 
         self.in_shape = in_shape
@@ -101,6 +104,7 @@ class ANT:
         self.training = False
         self.regression = regression
         self.use_router = use_router
+        self.max_depth = max_depth
 
         if self.regression:
             self.loss_function = nn.MSELoss(reduction="sum")
@@ -137,7 +141,7 @@ class ANT:
 
             # Create initial leaf and train it.
             self.root = SolverNode(
-                self, self.new_solver(self.in_shape, self.num_classes), 0
+                self, self.new_solver(self.in_shape, self.num_classes), 0, 0
             )
             optimizer = self.new_optimizer(self.root.parameters())
             batch_scheduler = self.new_batch_scheduler(optimizer)
@@ -502,10 +506,11 @@ class TransformerNode(TreeNode):
 
 
 class SolverNode(TreeNode):
-    def __init__(self, ant, solver, transformer_count):
+    def __init__(self, ant, solver, transformer_count, depth):
         super().__init__(ant, solver.in_shape, (1,), transformer_count)
         self.unexpanded_depth = 0
         self.solver = solver
+        self.depth = depth
 
     def tree_state_dict(self):
         return {
@@ -538,6 +543,9 @@ class SolverNode(TreeNode):
         # Mark leaf as expanded.
         self.unexpanded_depth = None
 
+        if self.depth >= self.ant.max_depth:
+            return self
+
         # Use pre-trained existing leaf (but don't re-train it).
         self.set_frozen(True)
         leaf_candidate = self.solver
@@ -548,6 +556,7 @@ class SolverNode(TreeNode):
             self.ant,
             self.ant.new_solver(t.out_shape, self.ant.num_classes),
             self.transformer_count + 1,
+            self.depth + 1
         )
         if self.ant.transformer_inherit:
             s.solver.load_state_dict(leaf_candidate.state_dict())
@@ -559,11 +568,13 @@ class SolverNode(TreeNode):
             self.ant,
             self.ant.new_solver(r.out_shape, self.ant.num_classes),
             self.transformer_count,
+            self.depth + 1
         )
         s2 = SolverNode(
             self.ant,
             self.ant.new_solver(r.out_shape, self.ant.num_classes),
             self.transformer_count,
+            self.depth + 1
         )
         if self.ant.router_inherit:
             s1.solver.load_state_dict(leaf_candidate.state_dict())
@@ -625,7 +636,9 @@ class SolverNode(TreeNode):
             best = 0
 
         if not self.ant.use_router and best == 2:
+            print("However the mode dont use router was enabled so choosing next best option")
             best = val_losses[:-1].argmin().item() # select the best (non-router) module
+            print("Best choice is now {}".format(["leaf", "transformer", "router"][best]))
 
         hist["growth_val_losses"].extend(l.tolist()[best] for l in
             hist_val_losses)
