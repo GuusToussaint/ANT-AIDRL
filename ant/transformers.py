@@ -70,6 +70,7 @@ class Conv2DRelu(Transformer):
                     kernel_size=kernel_size,
                 )
                 modules.append(conv)
+                modules.append(nn.BatchNorm2d(kernels))
                 modules.append(nn.ReLU())
                 current_shape = (kernels,) + new_shape
             else: 
