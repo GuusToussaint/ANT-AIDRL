@@ -8,7 +8,7 @@ ANT_types = [
     "ANT-MNIST-C", "ANT-MNIST-C-CNN", "ANT-MNIST-C-HME",
     "ANT-CIFAR10-A", "ANT-CIFAR10-A-CNN", "ANT-CIFAR10-A-HME",
     "ANT-CIFAR10-B", "ANT-CIFAR10-B-CNN", "ANT-CIFAR10-B-HME",
-    "ANT-CIFAR10-B", "ANT-CIFAR10-B-CNN", "ANT-CIFAR10-B-HME",
+    "ANT-CIFAR10-C", "ANT-CIFAR10-C-CNN", "ANT-CIFAR10-C-HME",
     "ANT-SARCOS", "ANT-SARCOS-CNN", "ANT-SARCOS-HME"
     ]
 
@@ -19,7 +19,6 @@ def get_ant_type():
     if num_of_args != 2:
         raise RuntimeError('incorrect number of arguments passed to function\n'
                            f'Usage: python ANT-experiments.py <one of {ANT_types}>')
-
     ant_type = sys.argv[1]
     if ant_type not in ANT_types:
         raise RuntimeError('Wrong preset passed to function\n'

@@ -132,10 +132,8 @@ class Presets():
         return single_path_acc, multi_path_acc
 
     def save_tree(self):
-        state_dict = self.tree.state_dict()
         if self.hist is not None:
             pickle.dump(self.hist, open(f"{self.type}-hist.p", "wb"))
-        pickle.dump(state_dict, open(f"{self.type}-state-dict.p", "wb"))
 
     def load_tree(self, root):
         state_dict = pickle.load(open(os.path.join(root, f"{self.type}-state-dict.p"), "rb"))
@@ -148,6 +146,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -169,6 +168,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -191,6 +191,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -213,6 +214,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -234,6 +236,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -256,6 +259,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -277,6 +281,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -298,6 +303,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -320,6 +326,7 @@ class Presets():
             # Downsample Freq:  2
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -342,6 +349,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -364,6 +372,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -387,6 +396,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -409,6 +419,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -431,6 +442,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -454,6 +466,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -476,6 +489,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -498,6 +512,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -521,6 +536,7 @@ class Presets():
             # Downsample Freq:  1
             return functools.partial(
                         ANT,
+                        ant_name=self.type,
                         in_shape=self.trainset[0][0].shape,
                         num_classes=self.num_classes,
                         new_router=functools.partial(
@@ -543,6 +559,7 @@ class Presets():
             # Downsample Freq:  0
             return functools.partial(
                 ANT,
+                ant_name=self.type,
                 in_shape=self.trainset[0][0].shape,
                 num_classes=self.num_classes,
                 new_router=functools.partial(
@@ -562,6 +579,7 @@ class Presets():
             # Downsample Freq:  0
             return functools.partial(
                 ANT,
+                ant_name=self.type,
                 in_shape=self.trainset[0][0].shape,
                 num_classes=self.num_classes,
                 new_router=functools.partial(
@@ -582,6 +600,7 @@ class Presets():
             # Downsample Freq:  0
             return functools.partial(
                 ANT,
+                ant_name=self.type,
                 in_shape=self.trainset[0][0].shape,
                 num_classes=self.num_classes,
                 new_router=functools.partial(

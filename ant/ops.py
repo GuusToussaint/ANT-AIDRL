@@ -3,6 +3,7 @@ import torch
 from torch._C import dtype
 import torch.nn as nn
 import numpy as np
+import pickle
 
 # References: https://r2rt.com/binary-stochastic-neurons-in-tensorflow.html
 # https://github.com/rtanno21609/AdaptiveNeuralTrees/blob/master/ops.py
@@ -130,6 +131,7 @@ def train(
     verbose=False,
     scheduler=None,
 ):
+    
     if verbose:
         model_parameters = filter(lambda p: p.requires_grad, model.parameters())
         params = sum([np.prod(p.size()) for p in model_parameters])
@@ -196,7 +198,14 @@ def train(
             if no_improvement_epochs > patience:
                 break
 
+        if val_loss < model.ant.best_val_loss:
+            pickle.dump(model.ant.state_dict(),  open(f"{model.ant.ant_name}-state-dict.p", "wb"))
+            model.ant.best_val_loss = val_loss
+            if verbose:
+                print('Storing new best ANT')
+        
         last_val_loss = val_loss
+        
 
 
 def eval(model, data_loader, loss_function, *, device=None):
@@ -213,9 +222,6 @@ def eval(model, data_loader, loss_function, *, device=None):
                 inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
-
-            # print(outputs.shape)
-            # print(labels.shape)
             loss = loss_function(outputs, labels)
             total += loss
             n += labels.size(0)

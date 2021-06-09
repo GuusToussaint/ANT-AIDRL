@@ -9,6 +9,7 @@ from torch import Tensor
 import gc
 import numpy as np
 import random
+import pickle
 import time
 
 from . import ops
@@ -24,6 +25,7 @@ from .ops import (
 class ANT:
     def __init__(
         self,
+        ant_name,
         in_shape,
         num_classes,
         new_router,
@@ -42,6 +44,8 @@ class ANT:
         max_depth=10
     ):
         """Adaptive Neural Tree (https://arxiv.org/pdf/1807.06699.pdf)
+
+        ant_name defines a name for the ANT
 
         in_shape gives the input shape (excluding first batch dimension).
 
@@ -105,6 +109,9 @@ class ANT:
         self.regression = regression
         self.use_router = use_router
         self.max_depth = max_depth
+
+        self.ant_name = ant_name
+        self.best_val_loss = float('inf')
 
         if self.regression:
             self.loss_function = nn.MSELoss(reduction="sum")
@@ -198,6 +205,8 @@ class ANT:
                         break
                     else:
                         raise
+                except:
+                    raise
 
             # Final refinement.
             if verbose:
@@ -642,6 +651,13 @@ class SolverNode(TreeNode):
 
         hist["growth_val_losses"].extend(l.tolist()[best] for l in
             hist_val_losses)
+
+        if val_losses[best] < self.ant.best_val_loss:
+            pickle.dump(self.ant.state_dict(),  open(f"{self.ant.ant_name}-state-dict.p", "wb"))
+            self.ant.best_val_loss = val_losses[best]
+            if verbose:
+                print('Storing new best ANT')
+
         return [self, transformer_candidate, router_candidate][best]
 
     def forward(self, x):
