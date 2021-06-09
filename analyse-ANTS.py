@@ -2,10 +2,17 @@ import sys
 import os
 import pickle
 from Presets import Presets
+from matplotlib import pyplot as plt
 
-ANT_types = ["ANT-MNIST-A", "ANT-MNIST-B", "ANT-MNIST-C",
-             "ANT-CIFAR10-A", "ANT-CIFAR10-B", "ANT-CIFAR10-C",
-             "ANT-SARCOS"]
+ANT_types = [
+    "ANT-MNIST-A", "ANT-MNIST-A-CNN", "ANT-MNIST-A-HME",
+    "ANT-MNIST-B", "ANT-MNIST-B-CNN", "ANT-MNIST-B-HME", 
+    "ANT-MNIST-C", "ANT-MNIST-C-CNN", "ANT-MNIST-C-HME",
+    "ANT-CIFAR10-A", "ANT-CIFAR10-A-CNN", "ANT-CIFAR10-A-HME",
+    "ANT-CIFAR10-B", "ANT-CIFAR10-B-CNN", "ANT-CIFAR10-B-HME",
+    "ANT-CIFAR10-C", "ANT-CIFAR10-C-CNN", "ANT-CIFAR10-C-HME",
+    "ANT-SARCOS", "ANT-SARCOS-CNN", "ANT-SARCOS-HME"
+    ]
 
 def get_performance(ant_type, root):
     ANT = Presets(ant_type)
@@ -14,16 +21,24 @@ def get_performance(ant_type, root):
     single_path_acc, multi_path_acc = ANT.get_accuracy()
     performance_type = "accuracy"
 
-    if "SARCOS" in ant_type: # dealing with regression
-        single_path_acc = single_path_acc / ANT.num_classes # deviding the MSE (sum) by the number of classes
-        multi_path_acc = multi_path_acc / ANT.num_classes # deviding the MSE (sum) by the number of classes
-        performance_type = "MSE"
-    else:
+    if "SARCOS" not in ant_type:
         single_path_acc = (1 - single_path_acc) * 100 # get the error
         multi_path_acc = (1 - multi_path_acc) * 100 # get the error
 
     print(f"single path {performance_type}:\t{single_path_acc:.2f}\n"
           f"multi path {performance_type}: \t{multi_path_acc:.2f}")
+
+
+def show_training(ant_type, root):
+    training_data = pickle.load(open(os.path.join(root, f'{ant_type}-hist.p'), "rb"))
+    print(training_data.keys())
+    for type in ['growth_val_losses', 'refinement_val_losses']:
+        plt.plot(
+            range(len(training_data[type])),
+            training_data[type]
+            )
+        plt.title(type)
+        plt.show()
 
 if __name__ == "__main__":
 
@@ -48,4 +63,6 @@ if __name__ == "__main__":
 
 
     print(f"Done loading the pre-trained files\nAnalysing results for {ant_type}")
+    show_training(ant_type, 'trained-ANTS')
+    # show_training(ant_type, '')
     get_performance(ant_type, 'trained-ANTS')
