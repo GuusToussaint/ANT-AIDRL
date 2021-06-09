@@ -219,6 +219,11 @@ class ANT:
             def hist_epoch_scheduler(val_loss):
                 hist["refinement_val_losses"].append(val_loss)
                 hist["refinement_endtimes"].append(time.time() - training_start)
+                if val_loss < self.best_val_loss:
+                    pickle.dump(self.state_dict(),  open(f"{self.ant_name}-state-dict.p", "wb"))
+                    self.best_val_loss = val_loss
+                    if verbose:
+                        print('Storing new best ANT')
                 if epoch_scheduler is not None:
                     epoch_scheduler(val_loss)
             ops.train(
@@ -652,9 +657,9 @@ class SolverNode(TreeNode):
         hist["growth_val_losses"].extend(l.tolist()[best] for l in
             hist_val_losses)
 
-        if val_losses[best] < self.ant.best_val_loss:
+        if val_losses[best].item() < self.ant.best_val_loss:
             pickle.dump(self.ant.state_dict(),  open(f"{self.ant.ant_name}-state-dict.p", "wb"))
-            self.ant.best_val_loss = val_losses[best]
+            self.ant.best_val_loss = val_losses[best].item()
             if verbose:
                 print('Storing new best ANT')
 

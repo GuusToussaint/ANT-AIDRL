@@ -197,12 +197,6 @@ def train(
                 no_improvement_epochs += 1
             if no_improvement_epochs > patience:
                 break
-
-        if val_loss < model.ant.best_val_loss:
-            pickle.dump(model.ant.state_dict(),  open(f"{model.ant.ant_name}-state-dict.p", "wb"))
-            model.ant.best_val_loss = val_loss
-            if verbose:
-                print('Storing new best ANT')
         
         last_val_loss = val_loss
         
