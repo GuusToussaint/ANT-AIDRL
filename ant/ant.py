@@ -219,7 +219,7 @@ class ANT:
                 optimizer,
                 max_final_epochs,
                 batch_scheduler=batch_scheduler,
-                epoch_scheduler=epoch_scheduler,
+                epoch_scheduler=hist_epoch_scheduler if track_history else epoch_scheduler,
                 val_loader=val_loader,
                 device=device,
                 verbose=verbose,
@@ -506,7 +506,7 @@ class TransformerNode(TreeNode):
 
 
 class SolverNode(TreeNode):
-    def __init__(self, ant, solver, transformer_count, depth):
+    def __init__(self, ant, solver, transformer_count, depth=0):
         super().__init__(ant, solver.in_shape, (1,), transformer_count)
         self.unexpanded_depth = 0
         self.solver = solver
