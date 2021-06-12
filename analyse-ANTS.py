@@ -32,13 +32,16 @@ def get_performance(ant_type, root):
 def show_training(ant_type, root):
     training_data = pickle.load(open(os.path.join(root, f'{ant_type}-hist.p'), "rb"))
     print(training_data.keys())
-    for type in ['growth_val_losses', 'refinement_val_losses']:
-        plt.plot(
-            range(len(training_data[type])),
-            training_data[type]
-            )
-        plt.title(type)
-        plt.show()
+
+    total_lenth = len(training_data['growth_val_losses']) + len(training_data['refinement_val_losses'])
+    plt.plot(
+        range(total_lenth),
+        training_data['growth_val_losses'] + training_data['refinement_val_losses']
+        )
+    plt.axvline(len(training_data['growth_val_losses']), linestyle='--')
+    plt.ylabel("loss")
+    plt.xlabel("epochs")
+    plt.savefig(f'{ant_type}-loss.pdf')
 
 if __name__ == "__main__":
 
